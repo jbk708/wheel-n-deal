@@ -1,6 +1,8 @@
 # wheel-n-deal
 
 ## project skeleton
+
+```
 /price-tracker
 │
 ├── backend/
@@ -55,3 +57,4 @@
     ├── start.sh
     ├── stop.sh
     └── restart.sh
+```
