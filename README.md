@@ -5,56 +5,50 @@
 ```
 /price-tracker
 │
-├── backend/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── app.py
-│   ├── config.py
+├── backend/                         # Unified backend with scraper and scheduler
+│   ├── Dockerfile                   # Single Docker configuration for backend, scraper, and scheduler
+│   ├── pyproject.toml               # Poetry project configuration
+│   ├── poetry.lock                  # Poetry lockfile with dependency versions
+│   ├── main.py                      # FastAPI entry point
+│   ├── celery.py                    # Celery configuration
+│   ├── config.py                    # Configuration file (env variables, settings)
+│   ├── routers/
+│   │   ├── __init__.py              # API router setup
+│   │   └── tracker.py               # Routes for product tracking
+│   ├── services/
+│   │   ├── scraper.py               # Scraper logic using Selenium
+│   │   └── notification.py          # Signal notification logic
+│   ├── tasks/
+│   │   └── price_check.py           # Celery task for scheduled price checks
 │   ├── utils/
-│   │   ├── whatsapp_handler.py
-│   │   └── notification.py
-│   └── templates/
-│
-├── scraper/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── scraper.py
-│   ├── utils/
-│   │   ├── scraper_utils.py
-│   │   └── parser.py
-│
-├── scheduler/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── celery.py
-│   └── tasks/
-│       └── price_check.py
+│   │   └── helpers.py               # Helper functions
+│   └── templates/                   # HTML templates (if any)
 │
 ├── database/
-│   ├── init.sql
-│   ├── Dockerfile
-│   └── config.env
+│   ├── init.sql                     # SQL initialization script
+│   ├── Dockerfile                   # Database Dockerfile
+│   └── config.env                   # Database configuration
 │
 ├── broker/
-│   ├── Dockerfile
+│   ├── Dockerfile                   # Message broker Dockerfile (e.g., Redis or RabbitMQ)
 │
-├── vpn/                          # VPN configuration for PIA
-│   ├── Dockerfile
-│   ├── openvpn/                  # OpenVPN configuration files
+├── vpn/                             # VPN configuration for PIA
+│   ├── Dockerfile                   # VPN Dockerfile
+│   ├── openvpn/                     # OpenVPN configuration files
 │   │   ├── credentials.conf
 │   │   └── vpn-config.ovpn
-│   └── cycle_ip.sh               # Script to cycle the IP address periodically
+│   └── cycle_ip.sh                  # IP cycling script for VPN
 │
-├── nginx/
-│   ├── nginx.conf
-│   ├── Dockerfile
+├── nginx/                           # Nginx proxy configuration
+│   ├── nginx.conf                   # Nginx configuration
+│   ├── Dockerfile                   # Nginx Dockerfile
 │
-├── docker-compose.yml
-├── .env
-├── requirements.txt
-├── README.md
-└── scripts/
-    ├── start.sh
-    ├── stop.sh
-    └── restart.sh
+├── docker-compose.yml               # Docker Compose configuration for all services
+├── .env                             # Environment variables for the project
+├── README.md                        # Documentation
+└── scripts/                         # Scripts for controlling Docker services
+    ├── start.sh                     # Script to start the services
+    ├── stop.sh                      # Script to stop the services
+    └── restart.sh                   # Script to restart the services
+
 ```
