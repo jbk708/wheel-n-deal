@@ -2,7 +2,7 @@ import subprocess
 from config import settings
 
 
-def send_signal_message_to_group(group_id: str, message: str):
+def send_signal_message(group_id: str, message: str):
     """
     Sends a message to a Signal group using signal-cli.
     """
@@ -27,3 +27,4 @@ def send_signal_message_to_group(group_id: str, message: str):
         print(f"Message sent to group {group_id}: {message}")
     except Exception as e:
         print(f"Error sending Signal message to group: {e}")
+        raise e  # Re-raise the exception so it can be caught by tests or calling code
