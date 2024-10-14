@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the local signal-cli directory to the container
+      - ./signal-cli:/root/.local/share/signal-cli
+    environment:
+      - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
+      - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
+    restart: always
+
+volumes:
+  signal-cli-data:
