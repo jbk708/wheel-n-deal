@@ -1,3 +1,6 @@
+#signal cli files
+signal-cli/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
