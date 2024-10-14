@@ -10,12 +10,12 @@ RUN apt-get update && \
     apt-get install -y google-chrome-stable \
     chromium-driver \
     openjdk-17-jre \
-    --no-install-recommends \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry for dependency management
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    /root/.local/bin/poetry --version  # Use the full path to check Poetry installation
+    poetry --version
 
 # Set Poetry path
 ENV PATH="/root/.local/bin:$PATH"
@@ -23,17 +23,17 @@ ENV PATH="/root/.local/bin:$PATH"
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy dependency files first to leverage Docker cache
+# Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
 # Install Python dependencies using Poetry
-RUN /root/.local/bin/poetry install --no-root
+RUN poetry install --no-root
 
-# Copy the rest of the application code into the container
+# Copy the rest of the application code
 COPY . .
 
-# Expose the port that FastAPI will run on
+# Expose the port for FastAPI
 EXPOSE 8000
 
-# Start the FastAPI server using Uvicorn
-CMD ["/root/.local/bin/poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Command to run FastAPI and Celery worker
+CMD ["bash", "-c", "poetry run uvicorn main:app --host 0.0.0.0 --port 8000 & poetry run celery -A celery worker --loglevel=info"]
