@@ -1,7 +1,8 @@
 import threading
 
-from backend.celery_app import Celery
+from celery_app import app as celery_app
 from fastapi import FastAPI
+from models import init_db
 from routers import tracker
 from services.listener import listen_to_group  # Import the listener function
 
@@ -11,14 +12,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Initialize Celery app for background tasks (if needed)
-celery_app = Celery(
-    "price_tracker",
-    broker="redis://broker:6379/0",  # Use Redis or other broker
-    backend="redis://broker:6379/0",
-)
-
-# Include the tracker router
+# Include routers
 app.include_router(tracker.router, prefix="/api/v1/tracker", tags=["tracker"])
 
 
@@ -28,6 +22,10 @@ def start_signal_listener():
     On FastAPI startup, this function starts the Signal listener in a separate thread.
     The listener will run as a background process and handle incoming Signal messages.
     """
+    # Initialize the database
+    init_db()
+    
+    # Start the Signal listener in a separate thread
     threading.Thread(target=listen_to_group, daemon=True).start()
 
 
