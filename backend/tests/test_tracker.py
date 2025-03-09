@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 from models import Product as DBProduct, PriceHistory
-from routers.tracker import Product, track_product, get_products
+from routers.tracker import Product, track_product, get_tracked_products
 
 # Mock data for the product_info returned by scrape_product_info
 mock_product_info = {"title": "Test Product", "price": "$100", "url": "https://example.com/product"}
@@ -266,7 +266,7 @@ async def test_get_products_success(mock_get_db_session):
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]
     
-    response = await get_products()
+    response = await get_tracked_products()
     
     # Verify the response
     assert len(response) == 2
@@ -298,7 +298,7 @@ async def test_get_products_error(mock_get_db_session):
     mock_session.query.side_effect = Exception("Database error")
     
     with pytest.raises(HTTPException) as exc_info:
-        await get_products()
+        await get_tracked_products()
     
     # Verify that an HTTPException was raised with a 500 status code
     assert exc_info.value.status_code == 500

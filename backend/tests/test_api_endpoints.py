@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from fastapi import HTTPException
-from routers.tracker import track_product, get_products
+from routers.tracker import track_product, get_tracked_products
 from models import Product as DBProduct, PriceHistory
 
 
@@ -224,7 +224,7 @@ def mock_db_session_for_products():
 async def test_get_products_success(mock_db_session_for_products):
     """Test the get_products function."""
     # Call the function
-    response = await get_products()
+    response = await get_tracked_products()
     
     # Verify the response
     assert len(response) == 2
@@ -259,7 +259,7 @@ async def test_get_products_error():
         
         # Call the function and expect an exception
         with pytest.raises(HTTPException) as exc_info:
-            await get_products()
+            await get_tracked_products()
         
         # Verify the exception
         assert exc_info.value.status_code == 500
