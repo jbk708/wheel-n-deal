@@ -33,11 +33,13 @@ SCRAPER_ERRORS_TOTAL = Counter(
 )
 SIGNAL_MESSAGES_SENT = Counter(
     "signal_messages_sent_total", 
-    "Total number of Signal messages sent"
+    "Total number of Signal messages sent",
+    ["type"]
 )
 SIGNAL_MESSAGES_FAILED = Counter(
     "signal_messages_failed_total", 
-    "Total number of Signal messages that failed to send"
+    "Total number of Signal messages that failed to send",
+    ["type", "error_type"]
 )
 PRICE_ALERTS_SENT = Counter(
     "price_alerts_sent_total", 
@@ -141,4 +143,36 @@ class ScraperMetrics:
         else:
             logger.debug(f"Scraper request for {self.website} completed in {latency:.4f} seconds")
         
-        return False  # Don't suppress exceptions 
+        return False  # Don't suppress exceptions
+
+# Middleware for FastAPI to track request metrics
+class PrometheusMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        request_start_time = time.time()
+        method = scope["method"]
+        path = scope["path"]
+        
+        ACTIVE_REQUESTS.inc()
+        
+        # Create a new send function to intercept the response
+        async def wrapped_send(message):
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=path, status=status_code).inc()
+                REQUEST_LATENCY.labels(method=method, endpoint=path).observe(time.time() - request_start_time)
+                ACTIVE_REQUESTS.dec()
+            await send(message)
+        
+        try:
+            await self.app(scope, receive, wrapped_send)
+        except Exception as e:
+            HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=path, status=500).inc()
+            REQUEST_LATENCY.labels(method=method, endpoint=path).observe(time.time() - request_start_time)
+            ACTIVE_REQUESTS.dec()
+            raise e 

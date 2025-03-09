@@ -33,14 +33,15 @@ def send_signal_message(message: str):
             logger.error(f"Failed to send Signal message: {error_message}")
             SIGNAL_MESSAGES_FAILED.labels(type="group", error_type="command_error").inc()
             raise Exception(
-                f"Signal message to group failed: {error_message}"
+                f"Signal message failed: {error_message}"
             )
 
         logger.info(f"Message sent to group {group_id[:8]}")
         SIGNAL_MESSAGES_SENT.labels(type="group").inc()
     except Exception as e:
-        logger.error(f"Error sending Signal message: {str(e)}", exc_info=True)
-        SIGNAL_MESSAGES_FAILED.labels(type="group", error_type=type(e).__name__).inc()
+        logger.error(f"Error sending Signal message: {str(e)}")
+        if not isinstance(e, Exception) or "Signal message failed" not in str(e):
+            SIGNAL_MESSAGES_FAILED.labels(type="group", error_type=type(e).__name__).inc()
         raise e  # Re-raise the exception so it can be caught by tests or calling code
 
 
@@ -74,6 +75,7 @@ def send_signal_message_to_group(group_id: str, message: str):
         logger.info(f"Message sent to specific group {group_id[:8]}")
         SIGNAL_MESSAGES_SENT.labels(type="specific_group").inc()
     except Exception as e:
-        logger.error(f"Error sending Signal message to specific group: {str(e)}", exc_info=True)
-        SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type=type(e).__name__).inc()
+        logger.error(f"Error sending Signal message to specific group: {str(e)}")
+        if not isinstance(e, Exception) or "Signal message to group failed" not in str(e):
+            SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type=type(e).__name__).inc()
         raise e  # Re-raise the exception so it can be caught by tests or calling code

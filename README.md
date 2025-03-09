@@ -67,6 +67,142 @@ The application consists of the following components:
    python -m backend.models.database
    ```
 
+## Deployment
+
+### Prerequisites for Deployment
+
+- Python 3.10+ (required by the backend)
+- Docker and Docker Compose (for containerized deployment)
+- Poetry (for Python package management)
+- Signal CLI setup with a registered phone number
+
+### Local Deployment with Poetry
+
+1. Install Poetry if you haven't already:
+   ```bash
+   curl -sSL https://install.python-poetry.org | python3 -
+   ```
+
+2. Navigate to the backend directory and install dependencies:
+   ```bash
+   cd backend
+   poetry install
+   ```
+
+3. Run the FastAPI server:
+   ```bash
+   poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+4. In a separate terminal, start the Celery worker:
+   ```bash
+   cd backend
+   poetry run celery -A celery_app worker --loglevel=info
+   ```
+
+### Docker Deployment (Recommended for Production)
+
+1. Make sure your `.env` file is properly configured with production settings:
+   ```
+   # Environment
+   ENVIRONMENT=production
+   LOG_LEVEL=INFO
+   
+   # Database
+   DATABASE_URL=postgresql://user:password@postgres:5432/wheel_n_deal
+   
+   # Signal
+   SIGNAL_PHONE_NUMBER=your_signal_phone_number
+   SIGNAL_GROUP_ID=your_signal_group_id
+   
+   # Security
+   SECRET_KEY=your_secure_secret_key
+   ```
+
+2. Set up Signal CLI:
+   
+   The application uses Signal for notifications. You need to set up Signal CLI with your phone number:
+   
+   ```bash
+   # Create a directory for Signal data
+   mkdir -p signal-cli
+   
+   # Register your phone number with Signal (you'll receive a verification code)
+   docker run --rm -v $(pwd)/signal-cli:/root/.local/share/signal-cli \
+     -it registry.gitlab.com/signald/signald-docker signal-cli \
+     -a YOUR_PHONE_NUMBER register
+   
+   # Verify your phone number with the code you received
+   docker run --rm -v $(pwd)/signal-cli:/root/.local/share/signal-cli \
+     -it registry.gitlab.com/signald/signald-docker signal-cli \
+     -a YOUR_PHONE_NUMBER verify CODE_YOU_RECEIVED
+   
+   # Get your Signal group ID (if you want to use a group for notifications)
+   docker run --rm -v $(pwd)/signal-cli:/root/.local/share/signal-cli \
+     -it registry.gitlab.com/signald/signald-docker signal-cli \
+     -a YOUR_PHONE_NUMBER listGroups
+   ```
+   
+   Update your `.env` file with the phone number and group ID.
+
+3. Build and start the Docker containers:
+   ```bash
+   ./run_docker.sh start
+   ```
+
+   This script provides several commands:
+   - `./run_docker.sh start`: Start all services
+   - `./run_docker.sh stop`: Stop all services
+   - `./run_docker.sh restart`: Restart all services
+   - `./run_docker.sh logs`: View logs from all services
+
+4. The application will be available at:
+   - API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
+   - Prometheus Metrics: http://localhost:8000/metrics
+
+5. Verify the deployment:
+   ```bash
+   # Check if all containers are running
+   docker ps
+   
+   # Check the logs
+   ./run_docker.sh logs
+   ```
+
+### Deployment to a Cloud Provider
+
+For deploying to cloud providers like AWS, GCP, or Azure:
+
+1. Build the Docker image:
+   ```bash
+   docker build -t wheel-n-deal:latest ./backend
+   ```
+
+2. Push the image to your container registry:
+   ```bash
+   docker tag wheel-n-deal:latest your-registry/wheel-n-deal:latest
+   docker push your-registry/wheel-n-deal:latest
+   ```
+
+3. Deploy using your cloud provider's container service (AWS ECS, GCP Cloud Run, Azure Container Instances, etc.)
+
+4. Make sure to configure environment variables in your cloud provider's dashboard or through infrastructure as code.
+
+### Continuous Integration/Deployment
+
+For CI/CD setup:
+
+1. Run tests before deployment:
+   ```bash
+   cd backend
+   poetry run pytest
+   ```
+
+2. Ensure all tests pass before deploying to production.
+
+3. Consider setting up a CI/CD pipeline using GitHub Actions, GitLab CI, or Jenkins.
+
 ### Running the Application
 
 1. Start the FastAPI server:

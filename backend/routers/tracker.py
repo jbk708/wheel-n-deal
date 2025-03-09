@@ -35,7 +35,7 @@ class ProductResponse(BaseModel):
 
 
 @router.post("/track", response_model=ProductResponse)
-def track_product(product: Product, db: Session = Depends(get_db_session)):
+async def track_product(product: Product, db: Session = Depends(get_db_session)):
     """
     Track a product by URL with an optional target price.
     If target_price is not provided, it will be set to 90% of the current price.
@@ -87,6 +87,14 @@ def track_product(product: Product, db: Session = Depends(get_db_session)):
         # Update tracked products metric
         TRACKED_PRODUCTS.inc()
         
+        # Schedule price check task
+        from tasks.price_check import check_price
+        check_price.apply_async(args=[product.url, product.target_price])
+        
+        # Send notification
+        message = f"Product is now being tracked: {product_info['title']} at ${product_info['price']}. Target price is ${product.target_price}."
+        send_signal_message_to_group(settings.SIGNAL_GROUP_ID, message)
+        
         logger.info(f"Product tracked successfully: {db_product.title} (ID: {db_product.id})")
         
         # Return response
@@ -109,7 +117,7 @@ def track_product(product: Product, db: Session = Depends(get_db_session)):
 
 
 @router.get("/products", response_model=List[ProductResponse])
-def get_tracked_products(db: Session = Depends(get_db_session)):
+async def get_tracked_products(db: Session = Depends(get_db_session)):
     """
     Get all tracked products with their current prices.
     """
@@ -148,7 +156,7 @@ def get_tracked_products(db: Session = Depends(get_db_session)):
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db_session)):
+async def get_product(product_id: int, db: Session = Depends(get_db_session)):
     """
     Get a specific tracked product by ID.
     """
@@ -188,7 +196,7 @@ def get_product(product_id: int, db: Session = Depends(get_db_session)):
 
 
 @router.delete("/products/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db_session)):
+async def delete_product(product_id: int, db: Session = Depends(get_db_session)):
     """
     Delete a tracked product by ID.
     """
@@ -218,7 +226,7 @@ def delete_product(product_id: int, db: Session = Depends(get_db_session)):
 
 
 @router.post("/check-prices")
-def check_prices(db: Session = Depends(get_db_session)):
+async def check_prices(db: Session = Depends(get_db_session)):
     """
     Check prices for all tracked products and send notifications if target price is reached.
     """
