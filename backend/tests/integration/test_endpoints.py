@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from routers.tracker import router, track_product, get_products
+from routers.tracker import router, track_product, get_tracked_products
 
 
 # Create a test FastAPI app with just the tracker router
