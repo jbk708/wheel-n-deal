@@ -26,7 +26,8 @@ jobs:
     - name: Install dependencies
       run: |
         cd backend
-        poetry install
+        # Try to install with root package first, if it fails, use --no-root
+        poetry install || poetry install --no-root
     
     - name: Run tests
       run: |
