@@ -1,6 +1,7 @@
 import random
 
 from celery import shared_task
+from models import Product, PriceHistory, get_db_session
 from services.notification import send_signal_message
 from services.scraper import scrape_product_info
 
@@ -22,18 +23,41 @@ def check_price(url: str, target_price: float):
             product_info["price"].replace("$", "").replace(",", "")
         )  # Handle comma and currency format
 
-        # Check if the current price is below or equal to the target price
-        if current_price <= target_price:
-            message = (
-                f"Price drop alert! {product_info['title']} is now {product_info['price']}.\n"
-                f"Target price was {target_price}."
-            )
-            send_signal_message(message)
-        else:
-            print(
-                f"Product: {product_info['title']} is still priced at {product_info['price']}, "
-                f"target price was {target_price}."
-            )
+        # Store the price in the database
+        db = get_db_session()
+        try:
+            # Get the product from the database
+            product = db.query(Product).filter(Product.url == url).first()
+            
+            if product:
+                # Add a new price history entry
+                price_history = PriceHistory(
+                    product_id=product.id,
+                    price=current_price
+                )
+                db.add(price_history)
+                db.commit()
+                
+                # Check if the current price is below or equal to the target price
+                if current_price <= target_price:
+                    message = (
+                        f"Price drop alert! {product_info['title']} is now {product_info['price']}.\n"
+                        f"Target price was {target_price}.\n"
+                        f"URL: {url}"
+                    )
+                    send_signal_message(message)
+                else:
+                    print(
+                        f"Product: {product_info['title']} is still priced at {product_info['price']}, "
+                        f"target price was {target_price}."
+                    )
+            else:
+                print(f"Product with URL {url} not found in the database.")
+        except Exception as e:
+            db.rollback()
+            print(f"Database error: {str(e)}")
+        finally:
+            db.close()
     except Exception as e:
         # Log the exception (or notify the user about the failure)
         print(f"Error occurred while checking price for {url}: {str(e)}")
