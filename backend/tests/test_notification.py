@@ -9,9 +9,9 @@ from config import settings
 # Load environment variables from .env file
 load_dotenv()
 
-# Get phone number from .env
-signal_phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
-signal_group_id = os.getenv("SIGNAL_GROUP_ID")
+# Get phone number from .env or use default test values
+signal_phone_number = os.getenv("SIGNAL_PHONE_NUMBER", "+1234567890")
+signal_group_id = os.getenv("SIGNAL_GROUP_ID", "test_group_id_12345678")
 
 
 # Mock the Prometheus metrics
@@ -32,7 +32,7 @@ def test_send_signal_message_success(mock_settings, mock_run, mock_prometheus_me
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
     
@@ -70,7 +70,7 @@ def test_send_signal_message_failure(mock_settings, mock_run, mock_prometheus_me
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
     
@@ -97,7 +97,7 @@ def test_send_signal_message_exception(mock_settings, mock_run, mock_prometheus_
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
     
@@ -119,13 +119,13 @@ def test_send_signal_message_to_group_success(mock_settings, mock_run, mock_prom
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     
     # Mock the result of subprocess.run to simulate a successful call
     mock_run.return_value = MagicMock(returncode=0)
     
-    group_id = "custom-group-id"
+    group_id = signal_group_id
     message = "Test Signal Message"
     
     # Call the function
@@ -157,7 +157,7 @@ def test_send_signal_message_to_group_failure(mock_settings, mock_run, mock_prom
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     
     # Simulate a failure (non-zero return code)
@@ -165,11 +165,11 @@ def test_send_signal_message_to_group_failure(mock_settings, mock_run, mock_prom
         returncode=1, stderr=MagicMock(decode=MagicMock(return_value="Failed to send"))
     )
     
-    group_id = "custom-group-id"
+    group_id = signal_group_id
     message = "Test Signal Message"
     
     # Call the function and expect an exception
-    with pytest.raises(Exception, match="Signal message to group failed: Failed to send"):
+    with pytest.raises(Exception, match="Failed to send Signal message to specific group: Failed to send"):
         send_signal_message_to_group(group_id, message)
     
     # Verify that the failure metric was incremented
@@ -184,10 +184,10 @@ def test_send_signal_message_to_group_exception(mock_settings, mock_run, mock_pr
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
-    # Mock the settings
+    # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     
-    group_id = "custom-group-id"
+    group_id = signal_group_id
     message = "Test Signal Message"
     
     # Call the function and expect an exception
