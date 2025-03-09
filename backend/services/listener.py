@@ -4,12 +4,10 @@ import time
 
 from config import settings
 from fastapi import HTTPException
+from models import Product as DBProduct, PriceHistory, get_db_session
 from pydantic import BaseModel
 from routers.tracker import track_product
 from services.notification import send_signal_message_to_group
-
-# List to store tracked products (in-memory for now)
-tracked_products = []
 
 
 # Define a simple Product model for incoming commands
@@ -48,67 +46,106 @@ def parse_message(message: str):
 
     elif "help" in message.lower():
         return {"command": "help"}
-
+        
     elif "list" in message.lower():
         return {"command": "list"}
-
+        
     elif "stop" in message.lower():
-        # Extract the number from the stop command
-        number_match = re.search(r"(\d+)", message)
+        # Extract the number after "stop"
+        number_match = re.search(r"stop\s+(\d+)", message.lower())
         if number_match:
-            return {"command": "stop", "number": int(number_match.group(0))}
+            try:
+                number = int(number_match.group(1))
+                return {"command": "stop", "number": number}
+            except ValueError:
+                return {
+                    "command": "invalid",
+                    "message": "Invalid number format. Use 'stop <number>'.",
+                }
         else:
             return {
                 "command": "invalid",
-                "message": "Invalid format. Use 'stop <number>'.",
+                "message": "Invalid stop command. Use 'stop <number>'.",
             }
-
+    
     else:
         return {
             "command": "invalid",
-            "message": "Unknown command. Use 'help' for available commands.",
+            "message": "Unknown command. Type 'help' for available commands.",
         }
 
 
 def handle_help_message():
     """
-    Return a help message with available commands.
+    Generate a help message with available commands.
     """
-    help_message = """
-    Available commands:
-    - track <url> <target_price>: Start tracking a product. Example: "track https://example.com/product 100.00"
-      - URL is required, target price is optional (defaults to 10% off).
-    - status: Check if the bot is running and tracking products.
-    - list: List all currently tracked products.
-    - stop <number>: Stop tracking a product by its number from the 'list' command.
-    - help: Show this message.
+    message = """
+Available commands:
+- track <url> [target_price] - Track a product URL with optional target price
+- status - Check if the bot is running
+- list - List all tracked products
+- stop <number> - Stop tracking a product by its number in the list
+- help - Show this help message
     """
-    return help_message
+    return message
 
 
 def handle_list_tracked_items():
     """
-    Returns the list of currently tracked items.
+    Generate a message with all tracked items.
     """
-    if not tracked_products:
-        return "No items are currently being tracked."
-
-    message = "Tracked items:\n"
-    for i, product in enumerate(tracked_products, 1):
-        message += f"{i}. {product['title']} (Target price: {product['target_price']}) - {product['url']}\n"
-
-    return message
+    db = get_db_session()
+    try:
+        products = db.query(DBProduct).all()
+        
+        if not products:
+            return "No products are currently being tracked."
+        
+        message = "Currently tracked products:\n"
+        for i, product in enumerate(products, 1):
+            # Get the latest price
+            latest_price = db.query(PriceHistory).filter(
+                PriceHistory.product_id == product.id
+            ).order_by(PriceHistory.timestamp.desc()).first()
+            
+            current_price = latest_price.price if latest_price else "Unknown"
+            
+            message += f"{i}. {product.title}\n"
+            message += f"   Current price: ${current_price}\n"
+            message += f"   Target price: ${product.target_price}\n"
+            message += f"   URL: {product.url}\n\n"
+        
+        return message
+    except Exception as e:
+        return f"Error retrieving tracked products: {str(e)}"
+    finally:
+        db.close()
 
 
 def stop_tracking_item(index: int):
     """
     Stop tracking the item by its index in the tracked products list.
     """
-    if 0 <= index < len(tracked_products):
-        removed_product = tracked_products.pop(index)
-        return f"Stopped tracking: {removed_product['title']}."
-    else:
-        return f"Invalid number. Please provide a number between 1 and {len(tracked_products)}."
+    db = get_db_session()
+    try:
+        # Get all products
+        products = db.query(DBProduct).all()
+        
+        if 0 <= index < len(products):
+            product_to_delete = products[index]
+            
+            # Delete the product and its price history (cascade)
+            db.delete(product_to_delete)
+            db.commit()
+            
+            return f"Stopped tracking: {product_to_delete.title}."
+        else:
+            return f"Invalid number. Please provide a number between 1 and {len(products)}."
+    except Exception as e:
+        db.rollback()
+        return f"Error stopping tracking: {str(e)}"
+    finally:
+        db.close()
 
 
 def listen_to_group():
@@ -144,19 +181,10 @@ def listen_to_group():
                         try:
                             # Simulate the API call to track_product (you may adapt this as needed)
                             response = track_product(product)
-
-                            # Store the tracked product in memory
-                            tracked_products.append(
-                                {
-                                    "title": response["product_info"]["title"],
-                                    "url": product.url,
-                                    "target_price": product.target_price or "10% off",
-                                }
-                            )
-
+                            
                             send_signal_message_to_group(
                                 group_id,
-                                f"Tracking product: {product.url} with target price {product.target_price or '10% off'}.",
+                                f"Tracking product: {parsed_command['url']} with target price {parsed_command['target_price'] or '10% off'}.",
                             )
                         except HTTPException as e:
                             send_signal_message_to_group(
