@@ -9,7 +9,32 @@ services:
     environment:
       - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
       - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
+    depends_on:
+      - broker
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build: ./backend
+    volumes:
+      - ./signal-cli:/root/.local/share/signal-cli
+    environment:
+      - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
+      - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
+    depends_on:
+      - broker
+      - backend
+    restart: always
+    command: celery -A celery_app worker --loglevel=info
+
+  broker:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - redis-data:/data
 
 volumes:
   signal-cli-data:
+  redis-data:

@@ -19,6 +19,7 @@ databases = "^0.9.0"
 asyncpg = "^0.29.0"
 selenium = "^4.25.0"
 celery = "^5.4.0"
+redis = "^5.0.1"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -26,11 +27,32 @@ pytest = "^8.3.3"
 ruff = "^0.6.9"
 pytest-mock = "^3.14.0"
 pytest-asyncio = "^0.24.0"
+pytest-cov = "^4.1.0"
+httpx = "^0.24.0"
 pylint = "^3.3.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[pytest]
-pythonpath = "backend"
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "--cov=. --cov-report=term-missing --cov-report=xml:coverage.xml"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "**/__pycache__/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
