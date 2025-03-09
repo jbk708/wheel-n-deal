@@ -38,15 +38,15 @@ def send_signal_message(message: str):
             error_message = result.stderr.decode().strip()
             logger.error(f"Failed to send Signal message: {error_message}")
             SIGNAL_MESSAGES_FAILED.labels(type="group", error_type="command_error").inc()
-            raise Exception(
-                f"Signal message failed: {error_message}"
-            )
+            raise Exception(f"Signal message failed: {error_message}")
 
         logger.info(f"Message sent to group {group_id[:8]}")
         SIGNAL_MESSAGES_SENT.labels(type="group").inc()
     except Exception as e:
-        logger.error(f"Error sending Signal message: {str(e)}")
-        SIGNAL_MESSAGES_FAILED.labels(type="group", error_type=type(e).__name__).inc()
+        # Only log and increment metrics if it's not our own exception
+        if not str(e).startswith("Signal message failed:"):
+            logger.error(f"Error sending Signal message: {str(e)}")
+            SIGNAL_MESSAGES_FAILED.labels(type="group", error_type=type(e).__name__).inc()
         raise
 
 
@@ -79,13 +79,13 @@ def send_signal_message_to_group(group_id: str, message: str):
             error_message = result.stderr.decode().strip()
             logger.error(f"Failed to send Signal message to specific group: {error_message}")
             SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type="command_error").inc()
-            raise Exception(
-                f"Failed to send Signal message to specific group: {error_message}"
-            )
+            raise Exception(f"Failed to send Signal message to specific group: {error_message}")
 
         logger.info(f"Message sent to specific group {group_id[:8]}")
         SIGNAL_MESSAGES_SENT.labels(type="specific_group").inc()
     except Exception as e:
-        logger.error(f"Error sending Signal message to specific group: {str(e)}")
-        SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type=type(e).__name__).inc()
+        # Only log and increment metrics if it's not our own exception
+        if not str(e).startswith("Failed to send Signal message to specific group:"):
+            logger.error(f"Error sending Signal message to specific group: {str(e)}")
+            SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type=type(e).__name__).inc()
         raise

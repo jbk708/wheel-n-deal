@@ -32,6 +32,10 @@ def test_send_signal_message_success(mock_settings, mock_run, mock_prometheus_me
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
+    
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
@@ -70,6 +74,10 @@ def test_send_signal_message_failure(mock_settings, mock_run, mock_prometheus_me
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
+    
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
@@ -97,6 +105,10 @@ def test_send_signal_message_exception(mock_settings, mock_run, mock_prometheus_
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
+    
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     mock_settings.SIGNAL_GROUP_ID = signal_group_id
@@ -118,6 +130,10 @@ def test_send_signal_message_exception(mock_settings, mock_run, mock_prometheus_
 def test_send_signal_message_to_group_success(mock_settings, mock_run, mock_prometheus_metrics):
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
+    
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
     
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
@@ -157,6 +173,10 @@ def test_send_signal_message_to_group_failure(mock_settings, mock_run, mock_prom
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
     
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
+    
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number
     
@@ -183,6 +203,10 @@ def test_send_signal_message_to_group_failure(mock_settings, mock_run, mock_prom
 def test_send_signal_message_to_group_exception(mock_settings, mock_run, mock_prometheus_metrics):
     # Unpack the mocks
     mock_sent, mock_failed = mock_prometheus_metrics
+    
+    # Reset mocks to ensure clean state
+    mock_sent.reset_mock()
+    mock_failed.reset_mock()
     
     # Mock the settings with valid test values
     mock_settings.SIGNAL_PHONE_NUMBER = signal_phone_number

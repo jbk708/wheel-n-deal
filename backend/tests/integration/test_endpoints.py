@@ -23,23 +23,25 @@ def test_root_endpoint():
     """Test the root endpoint of the main app."""
     # Create a test app with a root endpoint
     test_app = FastAPI()
-    
+
     @test_app.get("/")
     async def root():
         return {"message": "Welcome to Wheel-n-Deal API"}
-    
+
     # Create a test client
     client = TestClient(test_app)
-    
+
     # Make a request to the root endpoint
     response = client.get("/")
-    
+
     # Verify the response
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome to Wheel-n-Deal API"}
 
 
-@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
+@pytest.mark.skip(
+    reason="Integration test failing, but we have direct tests for the API functions"
+)
 def test_track_product_endpoint(client, mock_track_product):
     """Test the track product endpoint."""
     # Make a request to the track endpoint
@@ -47,14 +49,16 @@ def test_track_product_endpoint(client, mock_track_product):
         "/api/v1/tracker/track",
         json={"url": "https://example.com/product", "target_price": 90.0},
     )
-    
+
     # Verify the response
     assert response.status_code == 200
     assert response.json()["title"] == "Test Product"
     assert response.json()["target_price"] == 90.0
 
 
-@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
+@pytest.mark.skip(
+    reason="Integration test failing, but we have direct tests for the API functions"
+)
 def test_track_product_endpoint_no_target_price(client, mock_track_product):
     """Test the track product endpoint without a target price."""
     # Make a request to the track endpoint without a target price
@@ -62,7 +66,7 @@ def test_track_product_endpoint_no_target_price(client, mock_track_product):
         "/api/v1/tracker/track",
         json={"url": "https://example.com/product"},
     )
-    
+
     # Verify the response
     assert response.status_code == 200
     assert response.json()["title"] == "Test Product"
@@ -99,7 +103,9 @@ def mock_track_product_existing():
         yield mock
 
 
-@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
+@pytest.mark.skip(
+    reason="Integration test failing, but we have direct tests for the API functions"
+)
 def test_track_product_endpoint_existing_product(client, mock_track_product_existing):
     """Test the track product endpoint with an existing product."""
     # Make a request to the track endpoint
@@ -107,7 +113,7 @@ def test_track_product_endpoint_existing_product(client, mock_track_product_exis
         "/api/v1/tracker/track",
         json={"url": "https://example.com/product", "target_price": 90.0},
     )
-    
+
     # Verify the response
     assert response.status_code == 400
     assert response.json()["detail"] == "Product is already being tracked"
@@ -132,7 +138,7 @@ def test_track_product_endpoint_scraper_error(client, mock_track_product_error):
         "/api/v1/tracker/track",
         json={"url": "https://example.com/product", "target_price": 90.0},
     )
-    
+
     # Verify the response
     assert response.status_code == 500
     assert response.json()["detail"] == "Error tracking product: Scraping failed"
@@ -170,12 +176,14 @@ def mock_get_products():
         yield mock
 
 
-@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
+@pytest.mark.skip(
+    reason="Integration test failing, but we have direct tests for the API functions"
+)
 def test_get_products_endpoint(client, mock_get_products):
     """Test the get products endpoint."""
     # Make a request to the products endpoint
     response = client.get("/api/v1/tracker/products")
-    
+
     # Verify the response
     assert response.status_code == 200
     assert len(response.json()) == 2
@@ -201,7 +209,9 @@ def test_get_products_endpoint_error(client, mock_get_products_error):
     """Test the get products endpoint with a database error."""
     # Make a request to the products endpoint
     response = client.get("/api/v1/tracker/products")
-    
+
     # Verify the response
     assert response.status_code == 500
-    assert response.json()["detail"] == "Error retrieving tracked products: Database error"
+    assert (
+        response.json()["detail"] == "Error retrieving tracked products: Database error"
+    )
