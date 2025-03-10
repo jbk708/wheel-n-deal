@@ -259,6 +259,43 @@ The API includes:
 - Rate limiting to prevent abuse
 - IP blocking for suspicious activity
 
+## Code Quality
+
+The project uses several tools to maintain code quality:
+
+### Linting with Ruff
+
+Ruff is used for fast Python linting and formatting:
+
+```bash
+# Install pre-commit hooks
+pip install pre-commit
+pre-commit install
+
+# Run Ruff linter manually
+ruff check .
+
+# Run Ruff formatter manually
+ruff format .
+```
+
+### CI/CD Pipeline
+
+The CI/CD pipeline includes:
+- Linting with Ruff
+- Automated tests with pytest
+- Docker build and deployment
+
+To run the full CI checks locally:
+```bash
+# Run linting
+ruff check .
+ruff format --check .
+
+# Run tests
+pytest
+```
+
 ## License
 
 MIT

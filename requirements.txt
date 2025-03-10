@@ -32,4 +32,8 @@ waitress==2.1.2
 # Testing
 pytest==7.4.3
 httpx==0.25.1
-pytest-cov==4.1.0 
+pytest-cov==4.1.0
+
+# Code quality
+ruff==0.6.9
+pre-commit==3.6.2 
