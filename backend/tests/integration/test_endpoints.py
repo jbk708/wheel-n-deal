@@ -1,11 +1,10 @@
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, AsyncMock
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from routers.tracker import router, track_product, get_tracked_products
-from utils.monitoring import PrometheusMiddleware
+from routers.tracker import router
 
 
 # Create a test FastAPI app with just the tracker router

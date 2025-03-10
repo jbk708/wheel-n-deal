@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from celery_app import app as celery_app
 from tasks.price_check import check_price
 
 

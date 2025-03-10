@@ -218,11 +218,11 @@ def listen_to_group():
                         try:
                             # Call the API function to track the product
                             logger.info(f"Tracking product: {product.url}")
-                            response = track_product(product)
+                            track_product(product)
                             
                             send_signal_message_to_group(
                                 group_id,
-                                f"Tracking product: {parsed_command['url']} with target price {parsed_command['target_price'] or '10% off'}.",
+                                f"Product is now being tracked: {product.url}. Target price: {product.target_price}",
                             )
                         except HTTPException as e:
                             logger.error(f"Failed to track product: {str(e.detail)}")

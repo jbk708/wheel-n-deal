@@ -7,7 +7,6 @@ from services.listener import (
     handle_list_tracked_items,
     stop_tracking_item,
     listen_to_group,
-    Product,
 )
 
 
@@ -152,8 +151,7 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     # Set up the filter and order_by chain for price history
     mock_filter = MagicMock()
     mock_order_by = MagicMock()
-    mock_first = MagicMock()
-
+    
     mock_session.query.return_value.filter.return_value = mock_filter
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]

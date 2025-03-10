@@ -57,8 +57,8 @@ root_logger = get_logger("wheel_n_deal")
 root_logger.info(f"Logging initialized at level {LOG_LEVEL}")
 
 # Log startup information
-root_logger.info(f"Starting Wheel-n-Deal application")
-root_logger.debug(f"Debug logging is enabled")
+root_logger.info("Starting Wheel-n-Deal application")
+root_logger.debug("Debug logging is enabled")
 
 # Export the logger
 __all__ = ["get_logger"] 

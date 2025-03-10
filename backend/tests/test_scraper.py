@@ -1,14 +1,7 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from services.scraper import (
     scrape_product_info,
     get_website_type,
-    scrape_amazon,
-    scrape_walmart,
-    scrape_bestbuy,
-    scrape_target,
-    scrape_ebay,
-    scrape_generic,
 )
 
 

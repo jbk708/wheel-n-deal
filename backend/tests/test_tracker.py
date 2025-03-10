@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
-from models import Product as DBProduct, PriceHistory
 from routers.tracker import Product, track_product, get_tracked_products
 
 # Mock data for the product_info returned by scrape_product_info
@@ -97,7 +96,7 @@ async def test_track_product_no_target_price(
     mock_session.query.return_value.filter.return_value.first.return_value = None
 
     # Call the function directly with the mock session
-    response = await track_product(product_without_target_price, mock_session)
+    await track_product(product_without_target_price, mock_session)
 
     # Verify that a target price was set (90% of current price)
     assert product_without_target_price.target_price == 90.0  # 90% of $100
@@ -253,8 +252,7 @@ async def test_get_products_success(mock_get_db_session):
     # Set up the filter and order_by chain for price history
     mock_filter = MagicMock()
     mock_order_by = MagicMock()
-    mock_first = MagicMock()
-
+    
     mock_session.query.return_value.filter.return_value = mock_filter
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]

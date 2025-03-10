@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from dotenv import load_dotenv
 from services.notification import send_signal_message, send_signal_message_to_group
-from config import settings
 
 # Load environment variables from .env file
 load_dotenv()
