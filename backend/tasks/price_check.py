@@ -28,16 +28,13 @@ def check_price(url: str, target_price: float):
         try:
             # Get the product from the database
             product = db.query(Product).filter(Product.url == url).first()
-            
+
             if product:
                 # Add a new price history entry
-                price_history = PriceHistory(
-                    product_id=product.id,
-                    price=current_price
-                )
+                price_history = PriceHistory(product_id=product.id, price=current_price)
                 db.add(price_history)
                 db.commit()
-                
+
                 # Check if the current price is below or equal to the target price
                 if current_price <= target_price:
                     message = (

@@ -19,9 +19,9 @@ def send_signal_message(message: str):
         logger.error(error_msg)
         SIGNAL_MESSAGES_FAILED.labels(type="group", error_type="configuration_error").inc()
         raise Exception(f"Signal message failed: {error_msg}")
-        
+
     logger.info(f"Sending message to Signal group: {group_id[:8]}...")
-    
+
     try:
         command = [
             "signal-cli",
@@ -60,9 +60,9 @@ def send_signal_message_to_group(group_id: str, message: str):
         logger.error(error_msg)
         SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type="configuration_error").inc()
         raise Exception(f"Failed to send Signal message to specific group: {error_msg}")
-        
+
     logger.info(f"Sending message to specific Signal group: {group_id[:8]}...")
-    
+
     try:
         command = [
             "signal-cli",

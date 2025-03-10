@@ -33,17 +33,17 @@ def test_check_price_success(
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-    
+
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
     mock_session.query.return_value.filter.return_value.first.return_value = mock_product
-    
+
     check_price(valid_url, target_price)
 
     # Verify that scrape_product_info was called with the correct URL
     mock_scrape.assert_called_once_with(valid_url)
-    
+
     # Verify that a price history entry was added
     mock_session.add.assert_called_once()
     mock_session.commit.assert_called_once()
@@ -56,7 +56,7 @@ def test_check_price_success(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     assert mock_apply_async.call_args[1]["countdown"] in range(3600 - 600, 3600 + 600)
-    
+
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
 
@@ -67,22 +67,27 @@ def test_check_price_success(
 @patch("tasks.price_check.check_price.apply_async")
 @patch("tasks.price_check.get_db_session")
 def test_check_price_no_drop(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_url, lower_target_price
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_url,
+    lower_target_price,
 ):
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-    
+
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
     mock_session.query.return_value.filter.return_value.first.return_value = mock_product
-    
+
     check_price(valid_url, lower_target_price)
 
     # Verify that scrape_product_info was called with the correct URL
     mock_scrape.assert_called_once_with(valid_url)
-    
+
     # Verify that a price history entry was added
     mock_session.add.assert_called_once()
     mock_session.commit.assert_called_once()
@@ -93,7 +98,7 @@ def test_check_price_no_drop(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     assert mock_apply_async.call_args[1]["countdown"] in range(3600 - 600, 3600 + 600)
-    
+
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
 
@@ -109,15 +114,15 @@ def test_check_price_product_not_found(
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-    
+
     # Mock the product query (product not found)
     mock_session.query.return_value.filter.return_value.first.return_value = None
-    
+
     check_price(valid_url, target_price)
 
     # Verify that scrape_product_info was called with the correct URL
     mock_scrape.assert_called_once_with(valid_url)
-    
+
     # Verify that no price history entry was added
     mock_session.add.assert_not_called()
     mock_session.commit.assert_not_called()
@@ -128,7 +133,7 @@ def test_check_price_product_not_found(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     assert mock_apply_async.call_args[1]["countdown"] in range(3600 - 600, 3600 + 600)
-    
+
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
 
@@ -144,20 +149,20 @@ def test_check_price_database_error(
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-    
+
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
     mock_session.query.return_value.filter.return_value.first.return_value = mock_product
-    
+
     # Mock a database error
     mock_session.add.side_effect = Exception("Database error")
-    
+
     check_price(valid_url, target_price)
 
     # Verify that scrape_product_info was called with the correct URL
     mock_scrape.assert_called_once_with(valid_url)
-    
+
     # Verify that rollback was called
     mock_session.rollback.assert_called_once()
 
@@ -167,7 +172,7 @@ def test_check_price_database_error(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     assert mock_apply_async.call_args[1]["countdown"] in range(3600 - 600, 3600 + 600)
-    
+
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
 

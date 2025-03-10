@@ -22,7 +22,9 @@ def test_get_website_type():
 @patch("services.scraper.BeautifulSoup")
 @patch("services.scraper.get_website_type", return_value="amazon")
 @patch("services.scraper.scrape_amazon")
-def test_scrape_product_info_amazon(mock_scrape_amazon, mock_get_website_type, mock_soup, mock_chrome):
+def test_scrape_product_info_amazon(
+    mock_scrape_amazon, mock_get_website_type, mock_soup, mock_chrome
+):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
@@ -43,10 +45,10 @@ def test_scrape_product_info_amazon(mock_scrape_amazon, mock_get_website_type, m
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_amazon was called
     mock_scrape_amazon.assert_called_once()
 
@@ -56,7 +58,9 @@ def test_scrape_product_info_amazon(mock_scrape_amazon, mock_get_website_type, m
 @patch("services.scraper.BeautifulSoup")
 @patch("services.scraper.get_website_type", return_value="walmart")
 @patch("services.scraper.scrape_walmart")
-def test_scrape_product_info_walmart(mock_scrape_walmart, mock_get_website_type, mock_soup, mock_chrome):
+def test_scrape_product_info_walmart(
+    mock_scrape_walmart, mock_get_website_type, mock_soup, mock_chrome
+):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
@@ -77,10 +81,10 @@ def test_scrape_product_info_walmart(mock_scrape_walmart, mock_get_website_type,
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_walmart was called
     mock_scrape_walmart.assert_called_once()
 
@@ -90,7 +94,9 @@ def test_scrape_product_info_walmart(mock_scrape_walmart, mock_get_website_type,
 @patch("services.scraper.BeautifulSoup")
 @patch("services.scraper.get_website_type", return_value="bestbuy")
 @patch("services.scraper.scrape_bestbuy")
-def test_scrape_product_info_bestbuy(mock_scrape_bestbuy, mock_get_website_type, mock_soup, mock_chrome):
+def test_scrape_product_info_bestbuy(
+    mock_scrape_bestbuy, mock_get_website_type, mock_soup, mock_chrome
+):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
@@ -111,10 +117,10 @@ def test_scrape_product_info_bestbuy(mock_scrape_bestbuy, mock_get_website_type,
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_bestbuy was called
     mock_scrape_bestbuy.assert_called_once()
 
@@ -124,7 +130,9 @@ def test_scrape_product_info_bestbuy(mock_scrape_bestbuy, mock_get_website_type,
 @patch("services.scraper.BeautifulSoup")
 @patch("services.scraper.get_website_type", return_value="target")
 @patch("services.scraper.scrape_target")
-def test_scrape_product_info_target(mock_scrape_target, mock_get_website_type, mock_soup, mock_chrome):
+def test_scrape_product_info_target(
+    mock_scrape_target, mock_get_website_type, mock_soup, mock_chrome
+):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
@@ -145,10 +153,10 @@ def test_scrape_product_info_target(mock_scrape_target, mock_get_website_type, m
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_target was called
     mock_scrape_target.assert_called_once()
 
@@ -179,10 +187,10 @@ def test_scrape_product_info_ebay(mock_scrape_ebay, mock_get_website_type, mock_
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_ebay was called
     mock_scrape_ebay.assert_called_once()
 
@@ -192,7 +200,9 @@ def test_scrape_product_info_ebay(mock_scrape_ebay, mock_get_website_type, mock_
 @patch("services.scraper.BeautifulSoup")
 @patch("services.scraper.get_website_type", return_value="generic")
 @patch("services.scraper.scrape_generic")
-def test_scrape_product_info_generic(mock_scrape_generic, mock_get_website_type, mock_soup, mock_chrome):
+def test_scrape_product_info_generic(
+    mock_scrape_generic, mock_get_website_type, mock_soup, mock_chrome
+):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
@@ -213,10 +223,10 @@ def test_scrape_product_info_generic(mock_scrape_generic, mock_get_website_type,
     mock_chrome.assert_called_once()
     mock_driver.get.assert_called_once_with(url)
     mock_driver.quit.assert_called_once()
-    
+
     # Verify that get_website_type was called
     mock_get_website_type.assert_called_once_with(url)
-    
+
     # Verify that scrape_generic was called
     mock_scrape_generic.assert_called_once()
 
@@ -229,9 +239,10 @@ def test_scrape_product_info_timeout(mock_get_website_type, mock_wait, mock_chro
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
-    
+
     # Mock a timeout exception
     from selenium.common.exceptions import TimeoutException
+
     mock_wait.side_effect = TimeoutException("Timeout")
 
     # Call the function
@@ -256,7 +267,7 @@ def test_scrape_product_info_exception(mock_get_website_type, mock_chrome):
     # Mock the Selenium WebDriver behavior
     mock_driver = MagicMock()
     mock_chrome.return_value = mock_driver
-    
+
     # Mock an exception
     mock_driver.get.side_effect = Exception("Test exception")
 

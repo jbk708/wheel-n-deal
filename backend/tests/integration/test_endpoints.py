@@ -36,9 +36,7 @@ def test_root_endpoint():
     assert response.json() == {"message": "Welcome to Wheel-n-Deal API"}
 
 
-@pytest.mark.skip(
-    reason="Integration test failing, but we have direct tests for the API functions"
-)
+@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
 def test_track_product_endpoint(client, mock_track_product):
     """Test the track product endpoint."""
     # Make a request to the track endpoint
@@ -53,9 +51,7 @@ def test_track_product_endpoint(client, mock_track_product):
     assert response.json()["target_price"] == 90.0
 
 
-@pytest.mark.skip(
-    reason="Integration test failing, but we have direct tests for the API functions"
-)
+@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
 def test_track_product_endpoint_no_target_price(client, mock_track_product):
     """Test the track product endpoint without a target price."""
     # Make a request to the track endpoint without a target price
@@ -94,15 +90,11 @@ def mock_track_product_existing():
     """Mock the track_product function to raise an exception for existing product."""
     with patch("routers.tracker.track_product", new_callable=AsyncMock) as mock:
         # Mock the function to raise an exception
-        mock.side_effect = HTTPException(
-            status_code=400, detail="Product is already being tracked"
-        )
+        mock.side_effect = HTTPException(status_code=400, detail="Product is already being tracked")
         yield mock
 
 
-@pytest.mark.skip(
-    reason="Integration test failing, but we have direct tests for the API functions"
-)
+@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
 def test_track_product_endpoint_existing_product(client, mock_track_product_existing):
     """Test the track product endpoint with an existing product."""
     # Make a request to the track endpoint
@@ -173,9 +165,7 @@ def mock_get_products():
         yield mock
 
 
-@pytest.mark.skip(
-    reason="Integration test failing, but we have direct tests for the API functions"
-)
+@pytest.mark.skip(reason="Integration test failing, but we have direct tests for the API functions")
 def test_get_products_endpoint(client, mock_get_products):
     """Test the get products endpoint."""
     # Make a request to the products endpoint
@@ -209,6 +199,4 @@ def test_get_products_endpoint_error(client, mock_get_products_error):
 
     # Verify the response
     assert response.status_code == 500
-    assert (
-        response.json()["detail"] == "Error retrieving tracked products: Database error"
-    )
+    assert response.json()["detail"] == "Error retrieving tracked products: Database error"

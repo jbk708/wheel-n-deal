@@ -41,17 +41,19 @@ logger.add(
     level="ERROR",
 )
 
+
 def get_logger(name):
     """
     Get a logger with the given name.
-    
+
     Args:
         name (str): The name of the logger.
-        
+
     Returns:
         logger: A logger instance with the given name.
     """
     return logger.bind(name=name)
+
 
 # Initialize root logger
 root_logger = get_logger("wheel_n_deal")
@@ -62,4 +64,4 @@ root_logger.info("Starting Wheel-n-Deal application")
 root_logger.debug("Debug logging is enabled")
 
 # Export the logger
-__all__ = ["get_logger"] 
+__all__ = ["get_logger"]

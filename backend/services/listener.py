@@ -34,7 +34,7 @@ def parse_message(message: str):
     - "stop <number>" (Stop tracking item by number)
     """
     logger.debug(f"Parsing message: {message}")
-    
+
     if "track" in message.lower():
         # Extract URL and optional target price using regex
         url_match = re.search(r"(https?://\S+)", message)
@@ -59,11 +59,11 @@ def parse_message(message: str):
     elif "help" in message.lower():
         logger.info("Parsed help command")
         return {"command": "help"}
-        
+
     elif "list" in message.lower():
         logger.info("Parsed list command")
         return {"command": "list"}
-        
+
     elif "stop" in message.lower():
         # Extract the number after "stop"
         number_match = re.search(r"stop\s+(\d+)", message.lower())
@@ -84,7 +84,7 @@ def parse_message(message: str):
                 "command": "invalid",
                 "message": "Invalid stop command. Use 'stop <number>'.",
             }
-    
+
     else:
         logger.warning(f"Unknown command: {message}")
         return {
@@ -117,28 +117,31 @@ def handle_list_tracked_items():
     db = get_db_session()
     try:
         products = db.query(DBProduct).all()
-        
+
         # Update the tracked products metric
         TRACKED_PRODUCTS.set(len(products))
-        
+
         if not products:
             logger.info("No products are currently being tracked")
             return "No products are currently being tracked."
-        
+
         message = "Currently tracked products:\n"
         for i, product in enumerate(products, 1):
             # Get the latest price
-            latest_price = db.query(PriceHistory).filter(
-                PriceHistory.product_id == product.id
-            ).order_by(PriceHistory.timestamp.desc()).first()
-            
+            latest_price = (
+                db.query(PriceHistory)
+                .filter(PriceHistory.product_id == product.id)
+                .order_by(PriceHistory.timestamp.desc())
+                .first()
+            )
+
             current_price = latest_price.price if latest_price else "Unknown"
-            
+
             message += f"{i}. {product.title}\n"
             message += f"   Current price: ${current_price}\n"
             message += f"   Target price: ${product.target_price}\n"
             message += f"   URL: {product.url}\n\n"
-        
+
         logger.debug(f"Generated list of {len(products)} tracked products")
         return message
     except Exception as e:
@@ -157,24 +160,24 @@ def stop_tracking_item(index: int):
     try:
         # Get all products
         products = db.query(DBProduct).all()
-        
+
         # Update the tracked products metric
         TRACKED_PRODUCTS.set(len(products))
-        
+
         if 0 <= index < len(products):
             product_to_delete = products[index]
-            
+
             # Delete the product and its price history (cascade)
             db.delete(product_to_delete)
             db.commit()
-            
+
             # Update the tracked products metric after deletion
             TRACKED_PRODUCTS.set(len(products) - 1)
-            
+
             logger.info(f"Stopped tracking product: {product_to_delete.title}")
             return f"Stopped tracking: {product_to_delete.title}."
         else:
-            logger.warning(f"Invalid product index: {index}, valid range is 0-{len(products)-1}")
+            logger.warning(f"Invalid product index: {index}, valid range is 0-{len(products) - 1}")
             return f"Invalid number. Please provide a number between 1 and {len(products)}."
     except Exception as e:
         db.rollback()
@@ -196,9 +199,7 @@ def listen_to_group():
     while True:
         try:
             logger.debug("Waiting for Signal messages...")
-            result = subprocess.run(
-                command, capture_output=True
-            )
+            result = subprocess.run(command, capture_output=True)
             if result.returncode == 0:
                 output = result.stdout.decode("utf-8")
                 if group_id in output:
@@ -221,7 +222,7 @@ def listen_to_group():
                             # Call the API function to track the product
                             logger.info(f"Tracking product: {product.url}")
                             track_product(product)
-                            
+
                             send_signal_message_to_group(
                                 group_id,
                                 f"Product is now being tracked: {product.url}. Target price: {product.target_price}",
@@ -260,9 +261,7 @@ def listen_to_group():
                     else:
                         # Handle invalid commands
                         logger.warning(f"Invalid command: {parsed_command['message']}")
-                        send_signal_message_to_group(
-                            group_id, parsed_command["message"]
-                        )
+                        send_signal_message_to_group(group_id, parsed_command["message"])
 
             else:
                 error_message = result.stderr.decode("utf-8")

@@ -17,32 +17,33 @@ from utils.security import setup_security
 # Setup logger
 logger = get_logger("main")
 
+
 # Lifespan context manager for FastAPI
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize the database and start the Signal listener
     logger.info("Starting application...")
-    
+
     # Initialize the database
     logger.info("Initializing database...")
     init_db()
     logger.info("Database initialized successfully")
-    
+
     # Start the Signal listener in a separate thread
     logger.info("Starting Signal listener...")
     threading.Thread(target=listen_to_group, daemon=True).start()
     logger.info("Signal listener started successfully")
-    
+
     # Start Prometheus metrics server
     logger.info("Starting Prometheus metrics server...")
     app_metrics = make_wsgi_app()
-    httpd = make_server('', 8001, app_metrics)
+    httpd = make_server("", 8001, app_metrics)
     metrics_server = threading.Thread(target=httpd.serve_forever, daemon=True)
     metrics_server.start()
     logger.info("Prometheus metrics server started successfully on port 8001")
-    
+
     yield
-    
+
     # Shutdown: Clean up resources
     logger.info("Shutting down application...")
     # No cleanup needed for now
@@ -73,6 +74,7 @@ setup_security(app)
 
 # Include routers
 app.include_router(tracker_router, prefix="/api/v1/tracker", tags=["tracker"])
+
 
 # Exception handler
 @app.exception_handler(Exception)
