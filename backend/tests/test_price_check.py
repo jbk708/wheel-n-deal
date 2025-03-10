@@ -46,9 +46,7 @@ def test_check_price_success(
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
-    mock_session.query.return_value.filter.return_value.first.return_value = (
-        mock_product
-    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_product
 
     check_price(valid_url, target_price)
 
@@ -95,9 +93,7 @@ def test_check_price_no_drop(
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
-    mock_session.query.return_value.filter.return_value.first.return_value = (
-        mock_product
-    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_product
 
     check_price(valid_url, lower_target_price)
 
@@ -185,9 +181,7 @@ def test_check_price_database_error(
     # Mock the product query
     mock_product = MagicMock()
     mock_product.id = 1
-    mock_session.query.return_value.filter.return_value.first.return_value = (
-        mock_product
-    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_product
 
     # Mock a database error
     mock_session.add.side_effect = Exception("Database error")
@@ -215,9 +209,7 @@ def test_check_price_database_error(
 
 
 # Test for failure during scraping (raises an exception)
-@patch(
-    "tasks.price_check.scrape_product_info", side_effect=Exception("Scraping failed")
-)
+@patch("tasks.price_check.scrape_product_info", side_effect=Exception("Scraping failed"))
 @patch("tasks.price_check.send_signal_message")
 @patch("tasks.price_check.check_price.apply_async")
 @patch("tasks.price_check.get_db_session")
