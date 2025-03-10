@@ -1,7 +1,6 @@
 import threading
 from contextlib import asynccontextmanager
 
-from celery_app import app as celery_app
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,10 +9,10 @@ from wsgiref.simple_server import make_server
 import uvicorn
 
 from models import init_db
-from routers import tracker
+from routers.tracker import router as tracker_router
 from services.listener import listen_to_group
 from utils.logging import get_logger
-from utils.monitoring import PrometheusMiddleware, TRACKED_PRODUCTS
+from utils.monitoring import PrometheusMiddleware
 from utils.security import setup_security
 
 # Setup logger
@@ -74,7 +73,7 @@ app.add_middleware(PrometheusMiddleware)
 setup_security(app)
 
 # Include routers
-app.include_router(tracker.router, prefix="/api/v1/tracker", tags=["tracker"])
+app.include_router(tracker_router, prefix="/api/v1/tracker", tags=["tracker"])
 
 # Exception handler
 @app.exception_handler(Exception)

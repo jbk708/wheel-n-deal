@@ -1,16 +1,13 @@
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock
 import time
-from prometheus_client import REGISTRY
 
 from utils.monitoring import (
     HTTP_REQUESTS_TOTAL,
     DATABASE_CONNECTIONS,
-    DATABASE_ERRORS,
     SCRAPER_REQUESTS_TOTAL,
     SCRAPER_ERRORS_TOTAL,
     SIGNAL_MESSAGES_SENT,
-    SIGNAL_MESSAGES_FAILED,
     PRICE_ALERTS_SENT,
     TRACKED_PRODUCTS,
     track_request_latency,
@@ -95,7 +92,7 @@ def test_scraper_metrics_success():
     requests_initial = SCRAPER_REQUESTS_TOTAL.labels(website=website)._value.get()
     
     # Use the context manager
-    with ScraperMetrics(website) as metrics:
+    with ScraperMetrics(website):
         # Simulate some work
         time.sleep(0.01)
     

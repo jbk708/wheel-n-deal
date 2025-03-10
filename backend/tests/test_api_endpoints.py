@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 
 from fastapi import HTTPException
 from routers.tracker import track_product, get_tracked_products
-from models import Product as DBProduct, PriceHistory
 
 
 @pytest.fixture

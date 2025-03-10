@@ -1,7 +1,7 @@
 import pytest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException
 from jose import jwt
 
 from utils.security import (
@@ -19,7 +19,6 @@ from utils.security import (
     SECRET_KEY,
     ALGORITHM,
     User,
-    UserInDB,
 )
 
 
