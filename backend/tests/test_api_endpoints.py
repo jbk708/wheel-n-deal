@@ -1,8 +1,8 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import HTTPException
-from routers.tracker import track_product, get_tracked_products
+from routers.tracker import get_tracked_products, track_product
 
 
 @pytest.fixture

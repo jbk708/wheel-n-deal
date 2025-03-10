@@ -1,7 +1,8 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
-from routers.tracker import Product, track_product, get_tracked_products
+from routers.tracker import Product, get_tracked_products, track_product
 
 # Mock data for the product_info returned by scrape_product_info
 mock_product_info = {

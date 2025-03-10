@@ -1,12 +1,12 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from services.listener import (
-    parse_message,
     handle_help_message,
     handle_list_tracked_items,
-    stop_tracking_item,
     listen_to_group,
+    parse_message,
+    stop_tracking_item,
 )
 
 

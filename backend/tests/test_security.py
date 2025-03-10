@@ -1,24 +1,24 @@
-import pytest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import FastAPI, HTTPException
 from jose import jwt
-
 from utils.security import (
-    verify_password,
+    ALGORITHM,
+    SECRET_KEY,
+    User,
+    authenticate_user,
+    block_ip,
+    create_access_token,
+    fake_users_db,
+    get_current_active_user,
+    get_current_user,
     get_password_hash,
     get_user,
-    authenticate_user,
-    create_access_token,
-    get_current_user,
-    get_current_active_user,
     is_ip_blocked,
-    block_ip,
     setup_security,
-    fake_users_db,
-    SECRET_KEY,
-    ALGORITHM,
-    User,
+    verify_password,
 )
 
 

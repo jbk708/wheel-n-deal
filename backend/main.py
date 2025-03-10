@@ -1,14 +1,13 @@
 import threading
 from contextlib import asynccontextmanager
+from wsgiref.simple_server import make_server
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_client import make_wsgi_app
-from wsgiref.simple_server import make_server
-import uvicorn
-
 from models import init_db
+from prometheus_client import make_wsgi_app
 from routers.tracker import router as tracker_router
 from services.listener import listen_to_group
 from utils.logging import get_logger
