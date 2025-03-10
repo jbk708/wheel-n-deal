@@ -65,9 +65,7 @@ async def test_track_product_success(
     assert str(valid_product.target_price) in args[1]
 
     # Verify that check_price.apply_async was called with the correct arguments
-    mock_apply_async.assert_called_once_with(
-        args=[valid_product.url, valid_product.target_price]
-    )
+    mock_apply_async.assert_called_once_with(args=[valid_product.url, valid_product.target_price])
 
     # Verify the response
     assert response["url"] == valid_product.url
@@ -132,9 +130,7 @@ async def test_track_product_existing(
     mock_existing_product.url = "https://example.com/product"
     mock_existing_product.target_price = 85.0
 
-    mock_session.query.return_value.filter.return_value.first.return_value = (
-        mock_existing_product
-    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_existing_product
 
     # Call the function and expect an exception
     with pytest.raises(HTTPException) as exc_info:
@@ -253,7 +249,7 @@ async def test_get_products_success(mock_get_db_session):
     # Set up the filter and order_by chain for price history
     mock_filter = MagicMock()
     mock_order_by = MagicMock()
-    
+
     mock_session.query.return_value.filter.return_value = mock_filter
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]

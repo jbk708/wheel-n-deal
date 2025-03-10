@@ -1,9 +1,7 @@
 from celery import Celery
 
 # Initialize the Celery app with Redis as the broker and backend
-app = Celery(
-    "price_tracker", broker="redis://broker:6379/0", backend="redis://broker:6379/0"
-)
+app = Celery("price_tracker", broker="redis://broker:6379/0", backend="redis://broker:6379/0")
 
 # Import tasks to register them with Celery
 app.autodiscover_tasks(["tasks"])

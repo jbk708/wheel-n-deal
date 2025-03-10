@@ -132,11 +132,11 @@ async def get_current_active_user(current_user: User = current_user_dependency):
 def rate_limit(limit: str, key_func=get_remote_address):
     """
     Rate limiting decorator for FastAPI endpoints.
-    
+
     Args:
         limit (str): The rate limit string (e.g., "5/minute", "100/hour").
         key_func (callable): Function to extract the key from the request.
-        
+
     Returns:
         callable: The decorated function.
     """
@@ -150,10 +150,10 @@ blocked_ips = set()
 def is_ip_blocked(request: Request) -> bool:
     """
     Check if an IP is blocked.
-    
+
     Args:
         request (Request): The FastAPI request object.
-        
+
     Returns:
         bool: True if the IP is blocked, False otherwise.
     """
@@ -164,14 +164,14 @@ def is_ip_blocked(request: Request) -> bool:
 def block_ip(ip: str, duration: int = 3600):
     """
     Block an IP address for a specified duration.
-    
+
     Args:
         ip (str): The IP address to block.
         duration (int): The duration in seconds to block the IP.
     """
     blocked_ips.add(ip)
     logger.warning(f"Blocked IP: {ip} for {duration} seconds")
-    
+
     # In a real implementation, you would use a background task to unblock the IP after the duration
     # For now, we'll just add it to the set
 
@@ -179,13 +179,13 @@ def block_ip(ip: str, duration: int = 3600):
 def setup_security(app: FastAPI):
     """
     Set up security for a FastAPI application.
-    
+
     Args:
         app (FastAPI): The FastAPI application.
     """
     # Add rate limiter middleware
     app.state.limiter = limiter
-    
+
     # Add IP blocking middleware
     @app.middleware("http")
     async def block_banned_ips(request: Request, call_next):
@@ -195,4 +195,4 @@ def setup_security(app: FastAPI):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your IP has been blocked due to suspicious activity",
             )
-        return await call_next(request) 
+        return await call_next(request)

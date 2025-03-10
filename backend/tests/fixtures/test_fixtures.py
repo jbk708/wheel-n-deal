@@ -32,10 +32,10 @@ def sample_product(test_db_session):
     )
     test_db_session.add(product)
     test_db_session.commit()
-    
+
     # Refresh the product to get the ID
     test_db_session.refresh(product)
-    
+
     yield product
 
 
@@ -48,10 +48,10 @@ def sample_price_history(test_db_session, sample_product):
     )
     test_db_session.add(price_history)
     test_db_session.commit()
-    
+
     # Refresh the price history to get the ID
     test_db_session.refresh(price_history)
-    
+
     yield price_history
 
 
@@ -75,16 +75,16 @@ def multiple_products(test_db_session):
             target_price=70.0,
         ),
     ]
-    
+
     for product in products:
         test_db_session.add(product)
-    
+
     test_db_session.commit()
-    
+
     # Refresh the products to get the IDs
     for product in products:
         test_db_session.refresh(product)
-    
+
     yield products
 
 
@@ -109,14 +109,14 @@ def multiple_price_histories(test_db_session, multiple_products):
             price=80.0,
         ),
     ]
-    
+
     for price_history in price_histories:
         test_db_session.add(price_history)
-    
+
     test_db_session.commit()
-    
+
     # Refresh the price histories to get the IDs
     for price_history in price_histories:
         test_db_session.refresh(price_history)
-    
+
     yield price_histories

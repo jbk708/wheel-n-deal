@@ -151,7 +151,7 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     # Set up the filter and order_by chain for price history
     mock_filter = MagicMock()
     mock_order_by = MagicMock()
-    
+
     mock_session.query.return_value.filter.return_value = mock_filter
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]
@@ -245,10 +245,10 @@ def test_stop_tracking_item_exception(mock_get_db_session):
 class MockSubprocessResult:
     def __init__(self, returncode, stdout_text):
         self.returncode = returncode
-        self.stdout = stdout_text.encode('utf-8')
-    
+        self.stdout = stdout_text.encode("utf-8")
+
     def decode(self):
-        return self.stdout.decode('utf-8')
+        return self.stdout.decode("utf-8")
 
 
 @patch("services.listener.subprocess.run")
@@ -275,35 +275,37 @@ def test_listen_to_group_track_command(
     # Set up the mock settings
     mock_settings.SIGNAL_GROUP_ID = "test-group-id"
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
-    
+
     # Set up the mock subprocess run result
     mock_result = MockSubprocessResult(0, "test-group-id: track https://example.com/product 90.00")
     mock_run.return_value = mock_result
-    
+
     # Set up the mock parse_message result
     mock_parse_message.return_value = {
         "command": "track",
         "url": "https://example.com/product",
         "target_price": 90.0,
     }
-    
+
     # Set up the mock track_product result
     mock_track_product.return_value = {
         "message": "Product is now being tracked",
         "product_info": {"title": "Test Product", "price": "$100"},
         "target_price": 90.0,
     }
-    
+
     # Make the function exit after one iteration
     mock_sleep.side_effect = Exception("Stop the loop")
-    
+
     # Call the function
     with pytest.raises(Exception, match="Stop the loop"):
         listen_to_group()
-    
+
     # Verify the function calls
     mock_run.assert_called_once()
-    mock_parse_message.assert_called_once_with("test-group-id: track https://example.com/product 90.00")
+    mock_parse_message.assert_called_once_with(
+        "test-group-id: track https://example.com/product 90.00"
+    )
     mock_track_product.assert_called_once()
     mock_send_message.assert_called_once()
     mock_sleep.assert_called_once()

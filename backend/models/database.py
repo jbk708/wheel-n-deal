@@ -21,7 +21,9 @@ logger = get_logger("database")
 # Create database engine
 try:
     engine = create_engine(settings.DATABASE_URL)
-    logger.info(f"Database engine created with URL: {settings.DATABASE_URL.replace('://', '://*:*@')}")
+    logger.info(
+        f"Database engine created with URL: {settings.DATABASE_URL.replace('://', '://*:*@')}"
+    )
     # Increment the database connections metric
     DATABASE_CONNECTIONS.inc()
 except Exception as e:
@@ -35,6 +37,7 @@ session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create base class for models
 Base = declarative_base()
+
 
 def get_db_session():
     """
@@ -51,6 +54,7 @@ def get_db_session():
         DATABASE_ERRORS.inc()
         raise
 
+
 def init_db():
     """
     Initialize the database by creating all tables.
@@ -65,6 +69,7 @@ def init_db():
         DATABASE_ERRORS.inc()
         raise
 
+
 # Product model
 class Product(Base):
     __tablename__ = "products"
@@ -77,9 +82,12 @@ class Product(Base):
     target_price = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationship with PriceHistory
-    price_history = relationship("PriceHistory", back_populates="product", cascade="all, delete-orphan")
+    price_history = relationship(
+        "PriceHistory", back_populates="product", cascade="all, delete-orphan"
+    )
+
 
 # PriceHistory model
 class PriceHistory(Base):
@@ -89,6 +97,6 @@ class PriceHistory(Base):
     product_id = Column(Integer, ForeignKey("products.id"))
     price = Column(Float)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationship with Product
-    product = relationship("Product", back_populates="price_history") 
+    product = relationship("Product", back_populates="price_history")
