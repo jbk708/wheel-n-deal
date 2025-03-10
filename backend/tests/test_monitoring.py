@@ -1,19 +1,19 @@
-import pytest
-from unittest.mock import AsyncMock
 import time
+from unittest.mock import AsyncMock
 
+import pytest
 from utils.monitoring import (
-    HTTP_REQUESTS_TOTAL,
     DATABASE_CONNECTIONS,
-    SCRAPER_REQUESTS_TOTAL,
-    SCRAPER_ERRORS_TOTAL,
-    SIGNAL_MESSAGES_SENT,
+    HTTP_REQUESTS_TOTAL,
     PRICE_ALERTS_SENT,
+    SCRAPER_ERRORS_TOTAL,
+    SCRAPER_REQUESTS_TOTAL,
+    SIGNAL_MESSAGES_SENT,
     TRACKED_PRODUCTS,
-    track_request_latency,
-    track_database_query_latency,
-    ScraperMetrics,
     PrometheusMiddleware,
+    ScraperMetrics,
+    track_database_query_latency,
+    track_request_latency,
 )
 
 

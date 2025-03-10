@@ -1,41 +1,45 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
-from sqlalchemy.orm import Session
+from typing import list
 
-from models import Product as DBProduct, PriceHistory, get_db_session
-from services.scraper import scrape_product_info
-from services.notification import send_signal_message_to_group
 from config import settings
+from fastapi import APIRouter, Depends, HTTPException
+from models import PriceHistory, get_db_session
+from models import Product as DBProduct
+from pydantic import BaseModel
+from services.notification import send_signal_message_to_group
+from services.scraper import scrape_product_info
+from sqlalchemy.orm import Session
 from utils.logging import get_logger
-from utils.monitoring import TRACKED_PRODUCTS, PRICE_ALERTS_SENT
+from utils.monitoring import PRICE_ALERTS_SENT, TRACKED_PRODUCTS
 
 # Setup logger
 logger = get_logger("tracker")
 
 router = APIRouter()
 
+# Create a module-level singleton for the database session dependency
+db_dependency = Depends(get_db_session)
+
 
 class Product(BaseModel):
     url: str
-    target_price: Optional[float] = None
+    target_price: float | None = None
 
 
 class ProductResponse(BaseModel):
     id: int
     url: str
     title: str
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    target_price: Optional[float] = None
-    current_price: Optional[float] = None
+    description: str | None = None
+    image_url: str | None = None
+    target_price: float | None = None
+    current_price: float | None = None
     created_at: datetime
     updated_at: datetime
 
 
 @router.post("/track", response_model=ProductResponse)
-async def track_product(product: Product, db: Session = Depends(get_db_session)):
+async def track_product(product: Product, db: Session = db_dependency):
     """
     Track a product by URL with an optional target price.
     If target_price is not provided, it will be set to 90% of the current price.
@@ -113,11 +117,11 @@ async def track_product(product: Product, db: Session = Depends(get_db_session))
     except Exception as e:
         db.rollback()
         logger.error(f"Error tracking product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error tracking product: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error tracking product: {str(e)}") from e
 
 
-@router.get("/products", response_model=List[ProductResponse])
-async def get_tracked_products(db: Session = Depends(get_db_session)):
+@router.get("/products", response_model=list[ProductResponse])
+async def get_tracked_products(db: Session = db_dependency):
     """
     Get all tracked products with their current prices.
     """
@@ -152,11 +156,11 @@ async def get_tracked_products(db: Session = Depends(get_db_session)):
     
     except Exception as e:
         logger.error(f"Error retrieving tracked products: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving tracked products: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving tracked products: {str(e)}") from e
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int, db: Session = Depends(get_db_session)):
+async def get_product(product_id: int, db: Session = db_dependency):
     """
     Get a specific tracked product by ID.
     """
@@ -192,11 +196,11 @@ async def get_product(product_id: int, db: Session = Depends(get_db_session)):
         raise
     except Exception as e:
         logger.error(f"Error retrieving product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving product: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving product: {str(e)}") from e
 
 
 @router.delete("/products/{product_id}")
-async def delete_product(product_id: int, db: Session = Depends(get_db_session)):
+async def delete_product(product_id: int, db: Session = db_dependency):
     """
     Delete a tracked product by ID.
     """
@@ -222,11 +226,11 @@ async def delete_product(product_id: int, db: Session = Depends(get_db_session))
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error deleting product: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting product: {str(e)}") from e
 
 
 @router.post("/check-prices")
-async def check_prices(db: Session = Depends(get_db_session)):
+async def check_prices(db: Session = db_dependency):
     """
     Check prices for all tracked products and send notifications if target price is reached.
     """
@@ -288,4 +292,4 @@ async def check_prices(db: Session = Depends(get_db_session)):
     
     except Exception as e:
         logger.error(f"Error checking prices: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error checking prices: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error checking prices: {str(e)}") from e

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -36,14 +35,14 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    username: str | None = None
 
 
 class User(BaseModel):
     username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
+    email: str | None = None
+    full_name: str | None = None
+    disabled: bool | None = None
 
 
 class UserInDB(User):
@@ -88,7 +87,7 @@ def authenticate_user(fake_db, username: str, password: str):
 
 
 # Token functions
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -112,14 +111,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             raise credentials_exception
         token_data = TokenData(username=username)
     except JWTError:
-        raise credentials_exception
+        raise credentials_exception from None
     user = get_user(fake_users_db, username=token_data.username)
     if user is None:
         raise credentials_exception
     return user
 
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
+# Create a module-level singleton for the current_user dependency
+current_user_dependency = Depends(get_current_user)
+
+
+async def get_current_active_user(current_user: User = current_user_dependency):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

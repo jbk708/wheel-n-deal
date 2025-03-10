@@ -1,8 +1,17 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+
 from config import settings
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    create_engine,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
 from utils.logging import get_logger
 from utils.monitoring import DATABASE_CONNECTIONS, DATABASE_ERRORS
 
@@ -22,7 +31,7 @@ except Exception as e:
     raise
 
 # Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create base class for models
 Base = declarative_base()
@@ -31,7 +40,7 @@ def get_db_session():
     """
     Get a database session.
     """
-    db = SessionLocal()
+    db = session_local()
     try:
         logger.debug("Database session created")
         return db

@@ -16,12 +16,12 @@ signal_group_id = os.getenv("SIGNAL_GROUP_ID", "test_group_id_12345678")
 # Mock the Prometheus metrics
 @pytest.fixture(autouse=True)
 def mock_prometheus_metrics():
-    with patch("services.notification.SIGNAL_MESSAGES_SENT") as mock_sent:
-        with patch("services.notification.SIGNAL_MESSAGES_FAILED") as mock_failed:
-            # Create mock Counter objects
-            mock_sent.labels.return_value.inc = MagicMock()
-            mock_failed.labels.return_value.inc = MagicMock()
-            yield mock_sent, mock_failed
+    with patch("services.notification.SIGNAL_MESSAGES_SENT") as mock_sent, \
+         patch("services.notification.SIGNAL_MESSAGES_FAILED") as mock_failed:
+        # Create mock Counter objects
+        mock_sent.labels.return_value.inc = MagicMock()
+        mock_failed.labels.return_value.inc = MagicMock()
+        yield mock_sent, mock_failed
 
 
 # Test successful message sending with send_signal_message

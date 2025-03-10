@@ -1,8 +1,7 @@
 import pytest
+from models import Base, PriceHistory, Product
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from models import Base, Product, PriceHistory
 
 
 @pytest.fixture
@@ -17,8 +16,8 @@ def test_db_engine():
 @pytest.fixture
 def test_db_session(test_db_engine):
     """Create a database session for testing."""
-    Session = sessionmaker(bind=test_db_engine)
-    session = Session()
+    session_factory = sessionmaker(bind=test_db_engine)
+    session = session_factory()
     yield session
     session.close()
 

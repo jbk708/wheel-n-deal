@@ -1,7 +1,8 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from services.scraper import (
-    scrape_product_info,
     get_website_type,
+    scrape_product_info,
 )
 
 

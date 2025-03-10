@@ -1,6 +1,8 @@
-from prometheus_client import Counter, Gauge, Histogram, Summary
 import time
 from contextlib import contextmanager
+
+from prometheus_client import Counter, Gauge, Histogram, Summary
+
 from utils.logging import get_logger
 
 # Setup logger

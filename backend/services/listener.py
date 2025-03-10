@@ -4,12 +4,14 @@ import time
 
 from config import settings
 from fastapi import HTTPException
-from models import Product as DBProduct, PriceHistory, get_db_session
+from models import PriceHistory, get_db_session
+from models import Product as DBProduct
 from pydantic import BaseModel
 from routers.tracker import track_product
-from services.notification import send_signal_message_to_group
 from utils.logging import get_logger
 from utils.monitoring import TRACKED_PRODUCTS
+
+from services.notification import send_signal_message_to_group
 
 # Setup logger
 logger = get_logger("listener")
@@ -195,7 +197,7 @@ def listen_to_group():
         try:
             logger.debug("Waiting for Signal messages...")
             result = subprocess.run(
-                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                command, capture_output=True
             )
             if result.returncode == 0:
                 output = result.stdout.decode("utf-8")

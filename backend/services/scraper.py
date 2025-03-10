@@ -2,14 +2,13 @@ import re
 import time
 from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
-from bs4 import BeautifulSoup
-
 from utils.logging import get_logger
 from utils.monitoring import ScraperMetrics
 
@@ -259,7 +258,7 @@ def scrape_product_info(url: str):
             # Wait for the page to load
             logger.debug("Waiting for page to load")
             WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
+                expected_conditions.presence_of_element_located((By.TAG_NAME, "body"))
             )
             
             # Add a small delay to ensure JavaScript has time to execute

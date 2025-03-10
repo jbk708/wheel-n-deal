@@ -1,7 +1,8 @@
 import subprocess
+
 from config import settings
 from utils.logging import get_logger
-from utils.monitoring import SIGNAL_MESSAGES_SENT, SIGNAL_MESSAGES_FAILED
+from utils.monitoring import SIGNAL_MESSAGES_FAILED, SIGNAL_MESSAGES_SENT
 
 # Setup logger
 logger = get_logger("notification")
@@ -32,7 +33,7 @@ def send_signal_message(message: str):
             "-m",
             message,
         ]
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(command, capture_output=True)
 
         if result.returncode != 0:
             error_message = result.stderr.decode().strip()
@@ -73,7 +74,7 @@ def send_signal_message_to_group(group_id: str, message: str):
             "-m",
             message,
         ]
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(command, capture_output=True)
 
         if result.returncode != 0:
             error_message = result.stderr.decode().strip()

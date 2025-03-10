@@ -1,7 +1,7 @@
 import random
 
 from celery import shared_task
-from models import Product, PriceHistory, get_db_session
+from models import PriceHistory, Product, get_db_session
 from services.notification import send_signal_message
 from services.scraper import scrape_product_info
 

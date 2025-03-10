@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -8,7 +9,7 @@ from sqlalchemy import (
     String,
     create_engine,
 )
-from sqlalchemy.orm import relationship, sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # Use declarative_base from sqlalchemy.orm instead of sqlalchemy.ext.declarative
 Base = declarative_base()
@@ -67,8 +68,8 @@ def get_db_session(engine=None):
     if engine is None:
         engine = get_db_engine()
 
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal()
+    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return session_local()
 
 
 def init_db():

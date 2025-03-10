@@ -1,11 +1,17 @@
-import pytest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+from models import (
+    Base,
+    PriceHistory,
+    Product,
+    get_db_engine,
+    get_db_session,
+    init_db,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from models import Base, Product, PriceHistory, get_db_engine, get_db_session, init_db
 
 
 @pytest.fixture
@@ -13,8 +19,8 @@ def test_db():
     """Create an in-memory SQLite database for testing."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session_factory = sessionmaker(bind=engine)
+    session = session_factory()
     yield session
     session.close()
 
