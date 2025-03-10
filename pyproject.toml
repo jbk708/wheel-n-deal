@@ -16,6 +16,9 @@ select = [
 ]
 ignore = [
     "E501",  # line too long, handled by formatter
+    "UP006", # Use `list` instead of `List` for type annotation
+    "UP007", # Use `X | Y` instead of `Union[X, Y]`
+    "UP035", # `typing.List` is deprecated, use `list` instead
 ]
 
 [tool.ruff.lint.isort]
