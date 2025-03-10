@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import list
+from typing import List, Optional
 
 from config import settings
 from fastapi import APIRouter, Depends, HTTPException
@@ -23,17 +23,17 @@ db_dependency = Depends(get_db_session)
 
 class Product(BaseModel):
     url: str
-    target_price: float | None = None
+    target_price: Optional[float] = None
 
 
 class ProductResponse(BaseModel):
     id: int
     url: str
     title: str
-    description: str | None = None
-    image_url: str | None = None
-    target_price: float | None = None
-    current_price: float | None = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    target_price: Optional[float] = None
+    current_price: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
@@ -121,7 +121,7 @@ async def track_product(product: Product, db: Session = db_dependency):
         raise HTTPException(status_code=500, detail=f"Error tracking product: {str(e)}") from e
 
 
-@router.get("/products", response_model=list[ProductResponse])
+@router.get("/products", response_model=List[ProductResponse])
 async def get_tracked_products(db: Session = db_dependency):
     """
     Get all tracked products with their current prices.
