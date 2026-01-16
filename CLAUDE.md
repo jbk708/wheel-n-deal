@@ -72,6 +72,9 @@ uv run ruff check .
 uv run ruff check . --fix
 uv run ruff format .
 
+# Type checking
+uv run ty check
+
 # Add a dependency
 uv add <package>
 
@@ -155,7 +158,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Add ty type checking | `pyproject.toml` | Add ty for static type analysis |
 | Set up Alembic | `backend/` | Initialize alembic, create initial migration |
 | Consolidate models | `models.py`, `models/database.py` | Keep one, delete duplicate |
 | Wire security routes | `main.py`, `security.py` | Register auth router, apply rate limiting |
