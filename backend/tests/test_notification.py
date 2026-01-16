@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from dotenv import load_dotenv
+
 from services.notification import send_signal_message, send_signal_message_to_group
 
 # Load environment variables from .env file
@@ -51,7 +52,7 @@ def test_send_signal_message_success(mock_settings, mock_run, mock_prometheus_me
 
     # Verify that subprocess.run was called with the correct arguments
     mock_run.assert_called_once()
-    args, kwargs = mock_run.call_args
+    args, _ = mock_run.call_args
     command = args[0]
 
     assert command[0] == "signal-cli"
@@ -150,7 +151,7 @@ def test_send_signal_message_to_group_success(mock_settings, mock_run, mock_prom
 
     # Verify that subprocess.run was called with the correct arguments
     mock_run.assert_called_once()
-    args, kwargs = mock_run.call_args
+    args, _ = mock_run.call_args
     command = args[0]
 
     assert command[0] == "signal-cli"
@@ -162,8 +163,8 @@ def test_send_signal_message_to_group_success(mock_settings, mock_run, mock_prom
     assert command[6] == "-m"
     assert command[7] == message
 
-    # Verify that the success metric was incremented
-    mock_sent.labels.assert_called_once_with(type="specific_group")
+    # Verify that the success metric was incremented (consolidated function uses "group")
+    mock_sent.labels.assert_called_once_with(type="group")
     mock_sent.labels.return_value.inc.assert_called_once()
 
 
@@ -190,13 +191,11 @@ def test_send_signal_message_to_group_failure(mock_settings, mock_run, mock_prom
     message = "Test Signal Message"
 
     # Call the function and expect an exception
-    with pytest.raises(
-        Exception, match="Failed to send Signal message to specific group: Failed to send"
-    ):
+    with pytest.raises(Exception, match="Signal message failed: Failed to send"):
         send_signal_message_to_group(group_id, message)
 
-    # Verify that the failure metric was incremented
-    mock_failed.labels.assert_called_once_with(type="specific_group", error_type="command_error")
+    # Verify that the failure metric was incremented (consolidated function uses "group")
+    mock_failed.labels.assert_called_once_with(type="group", error_type="command_error")
     mock_failed.labels.return_value.inc.assert_called_once()
 
 
@@ -221,6 +220,6 @@ def test_send_signal_message_to_group_exception(mock_settings, mock_run, mock_pr
     with pytest.raises(Exception, match="Subprocess error"):
         send_signal_message_to_group(group_id, message)
 
-    # Verify that the failure metric was incremented
-    mock_failed.labels.assert_called_once_with(type="specific_group", error_type="Exception")
+    # Verify that the failure metric was incremented (consolidated function uses "group")
+    mock_failed.labels.assert_called_once_with(type="group", error_type="Exception")
     mock_failed.labels.return_value.inc.assert_called_once()

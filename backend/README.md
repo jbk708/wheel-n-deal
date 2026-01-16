@@ -13,8 +13,8 @@ This is the backend service for the Wheel-n-Deal price tracking application. It 
 
 ### Prerequisites
 
-- Python 3.10+
-- Poetry for dependency management
+- Python 3.12+
+- uv for package management
 - Signal CLI for notifications
 - Redis for Celery broker
 
@@ -22,24 +22,24 @@ This is the backend service for the Wheel-n-Deal price tracking application. It 
 
 1. Install dependencies:
    ```bash
-   poetry install
+   uv sync
    ```
 
 2. Run the API server:
    ```bash
-   poetry run uvicorn main:app --reload
+   uv run uvicorn main:app --reload
    ```
 
 3. Run the Celery worker:
    ```bash
-   poetry run celery -A celery_app worker --loglevel=info
+   uv run celery -A celery_app worker --loglevel=info
    ```
 
 ## Testing
 
 Run the tests with pytest:
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 ## Deployment

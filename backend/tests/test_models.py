@@ -2,6 +2,9 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from models import (
     Base,
     PriceHistory,
@@ -10,8 +13,6 @@ from models import (
     get_db_session,
     init_db,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 
 @pytest.fixture
@@ -122,16 +123,41 @@ def test_relationship(test_db):
 
 
 @patch("models.create_engine")
-def test_get_db_engine(mock_create_engine):
-    """Test the get_db_engine function."""
+def test_get_db_engine_sqlite(mock_create_engine):
+    """Test the get_db_engine function with SQLite URL."""
     mock_engine = MagicMock()
     mock_create_engine.return_value = mock_engine
 
-    # Call the function
     engine = get_db_engine("sqlite:///test.db")
 
-    # Assertions
-    mock_create_engine.assert_called_once_with("sqlite:///test.db")
+    mock_create_engine.assert_called_once_with(
+        "sqlite:///test.db", connect_args={"check_same_thread": False}
+    )
+    assert engine == mock_engine
+
+
+@patch("models.create_engine")
+@patch("models.settings")
+def test_get_db_engine_postgres(mock_settings, mock_create_engine):
+    """Test the get_db_engine function with PostgreSQL URL uses connection pooling."""
+    mock_engine = MagicMock()
+    mock_create_engine.return_value = mock_engine
+    mock_settings.DB_POOL_SIZE = 5
+    mock_settings.DB_MAX_OVERFLOW = 10
+    mock_settings.DB_POOL_TIMEOUT = 30
+    mock_settings.DB_POOL_RECYCLE = 1800
+    mock_settings.DB_POOL_PRE_PING = True
+
+    engine = get_db_engine("postgresql://user:pass@localhost/db")
+
+    mock_create_engine.assert_called_once_with(
+        "postgresql://user:pass@localhost/db",
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=1800,
+        pool_pre_ping=True,
+    )
     assert engine == mock_engine
 
 

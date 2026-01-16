@@ -39,6 +39,7 @@ def test_scrape_product_info_amazon(
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly
@@ -75,6 +76,7 @@ def test_scrape_product_info_walmart(
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly
@@ -111,6 +113,7 @@ def test_scrape_product_info_bestbuy(
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly
@@ -147,6 +150,7 @@ def test_scrape_product_info_target(
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly
@@ -181,6 +185,7 @@ def test_scrape_product_info_ebay(mock_scrape_ebay, mock_get_website_type, mock_
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly
@@ -217,6 +222,7 @@ def test_scrape_product_info_generic(
     # Verify the result
     assert result["title"] == "Test Product"
     assert result["price"] == "$10.99"
+    assert result["price_float"] == 10.99
     assert result["url"] == url
 
     # Verify that the WebDriver was used correctly

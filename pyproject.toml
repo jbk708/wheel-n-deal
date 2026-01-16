@@ -1,25 +1,39 @@
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
+src = ["backend"]
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-    "N",  # pep8-naming
-    "SIM", # flake8-simplify
-    "TCH", # flake8-type-checking
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "S",    # flake8-bandit (security)
+    "A",    # flake8-builtins
+    "RUF",  # ruff-specific rules
+    "PERF", # perflint
 ]
 ignore = [
     "E501",  # line too long, handled by formatter
     "UP006", # Use `list` instead of `List` for type annotation
     "UP007", # Use `X | Y` instead of `Union[X, Y]`
     "UP035", # `typing.List` is deprecated, use `list` instead
+    "UP045", # Use `X | None` instead of `Optional[X]`
+    "S104",  # binding to all interfaces - intentional for Docker/server
+    "S311",  # pseudo-random for scheduling jitter, not crypto
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["S101", "S105"]  # Allow assert and test passwords in tests
+"**/services/listener.py" = ["S603"]  # subprocess for signal-cli
+"**/services/notification.py" = ["S603"]  # subprocess for signal-cli
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend"]
@@ -29,4 +43,22 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 skip-magic-trailing-comma = false
-docstring-code-format = true 
+docstring-code-format = true
+
+[tool.ty.environment]
+python-version = "3.12"
+python = "backend/.venv"
+
+[tool.ty.rules]
+# Treat deprecation warnings as warnings (not errors) during gradual adoption
+deprecated = "warn"
+
+[tool.ty.src]
+include = ["backend"]
+
+[[tool.ty.overrides]]
+# FastAPI/Starlette add_middleware has incorrect type stubs
+include = ["backend/main.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"

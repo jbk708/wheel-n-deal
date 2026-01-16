@@ -2,43 +2,42 @@
 
 # Setup development environment for Wheel-n-Deal
 
+set -e
+
 echo "Setting up development environment for Wheel-n-Deal..."
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
-    echo "Python 3 is not installed. Please install Python 3.10 or higher."
-    exit 1
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "uv is not installed. Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.local/bin/env
 fi
+
+echo "uv version: $(uv --version)"
 
 # Check Python version
 python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-required_version="3.10"
+required_version="3.12"
 
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
-    echo "Python version $python_version is too old. Please install Python 3.10 or higher."
-    exit 1
+    echo "Warning: Python version $python_version detected. Python 3.12+ is recommended."
 fi
 
 echo "Python version $python_version detected."
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
-fi
+# Navigate to backend directory
+cd backend
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source venv/bin/activate
-
-# Install dependencies
+# Install dependencies with uv
 echo "Installing dependencies..."
-pip install -r requirements.txt
+uv sync
 
 # Install pre-commit hooks
 echo "Installing pre-commit hooks..."
-pre-commit install
+uv run pre-commit install
 
+# Setup environment variables
+cd ..
 echo "Setting up environment variables..."
 if [ ! -f ".env" ]; then
     echo "Creating .env file from template..."
@@ -46,18 +45,14 @@ if [ ! -f ".env" ]; then
     echo "Please edit the .env file with your configuration."
 fi
 
+echo ""
 echo "Development environment setup complete!"
 echo ""
-echo "To activate the environment, run:"
-echo "  source venv/bin/activate"
+echo "Commands (run from backend/ directory):"
+echo "  uv run uvicorn main:app --reload  # Start API server"
+echo "  uv run pytest                      # Run tests"
+echo "  uv run ruff check . --fix          # Lint and fix"
+echo "  uv run ruff format .               # Format code"
+echo "  uv run ty check                    # Type check"
 echo ""
-echo "To run the linter:"
-echo "  ruff check ."
-echo ""
-echo "To run the formatter:"
-echo "  ruff format ."
-echo ""
-echo "To run tests:"
-echo "  pytest"
-echo ""
-echo "Happy coding!" 
+echo "Happy coding!"
