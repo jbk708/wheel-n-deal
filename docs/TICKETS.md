@@ -4,13 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-027 | Update tracker API to filter products by authenticated user | In Progress | feat-WND-027-filter-products-by-user |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| **Phase 1: User Identity Foundation** | | |
-| WND-027 | Update tracker API to filter products by authenticated user | High |
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
 | WND-028 | Parse sender phone/username from signal-cli JSON output | High |
 | WND-029 | Auto-create User record for new Signal senders | High |
