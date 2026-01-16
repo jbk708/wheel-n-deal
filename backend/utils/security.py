@@ -10,6 +10,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from config import settings
+from models import User as DBUser
+from models import get_db_session
 from utils.logging import get_logger
 
 # Setup logger
@@ -51,16 +53,22 @@ class UserInDB(User):
     hashed_password: str
 
 
-# Fake user database - replace with actual database in production
-fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "full_name": "Admin User",
-        "email": "admin@example.com",
-        "hashed_password": pwd_context.hash("adminpassword"),
-        "disabled": False,
-    }
-}
+class UserCreate(BaseModel):
+    """Schema for user registration."""
+
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """Schema for user response (excludes password)."""
+
+    id: int
+    email: str
+    signal_phone: Optional[str] = None
+    signal_username: Optional[str] = None
+
+    model_config = {"from_attributes": True}
 
 
 # Password functions
@@ -73,18 +81,30 @@ def get_password_hash(password):
 
 
 # User functions
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
+def get_user_by_email(db_session, email: str) -> DBUser | None:
+    """Get a user by email from the database."""
+    return db_session.query(DBUser).filter(DBUser.email == email).first()
 
 
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
+def create_user(db_session, email: str, password: str) -> DBUser:
+    """Create a new user in the database."""
+    hashed_password = get_password_hash(password)
+    user = DBUser(email=email, password_hash=hashed_password)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def authenticate_user_db(db_session, email: str, password: str) -> DBUser | None:
+    """Authenticate a user against the database."""
+    user = get_user_by_email(db_session, email)
     if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
+        return None
+    if not user.password_hash:
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
     return user
 
 
@@ -101,6 +121,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
+    """Get the current user from the JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -108,24 +129,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception from None
-    user = get_user(fake_users_db, username=username)
-    if user is None:
-        raise credentials_exception
-    return user
+
+    db_session = get_db_session()
+    try:
+        user = get_user_by_email(db_session, email)
+        if user is None:
+            raise credentials_exception
+        return user
+    finally:
+        db_session.close()
 
 
 # Create a module-level singleton for the current_user dependency
 current_user_dependency = Depends(get_current_user)
 
 
-async def get_current_active_user(current_user: User = current_user_dependency):
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
+async def get_current_active_user(current_user: DBUser = current_user_dependency):
+    """Get the current active user. Returns the user if authenticated."""
     return current_user
 
 
