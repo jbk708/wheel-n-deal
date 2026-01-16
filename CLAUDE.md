@@ -152,12 +152,22 @@ From the project root:
 - Docker deployment with all services
 - Database migrations with Alembic
 
-### Known Issues
+### Known Limitations
 
 **Low Priority**:
 - Static user agent in scraper (easily detected)
 
-See `docs/ARCHITECTURE.md` for system design details.
+### Planned Features (Roadmap)
+
+**Phase 1 - User Identity**: Add User model, per-user product tracking (WND-024 to WND-027)
+
+**Phase 2 - Command Prefix**: Require `!` prefix for Signal commands (!track, !list, !stop), scope commands to sender's products (WND-028 to WND-032)
+
+**Phase 3 - Web Interface**: React frontend for browser-based product management (WND-033 to WND-039)
+
+**Phase 4 - Signal Bot Framework**: Extract reusable bot infrastructure into monorepo structure with plugin interface (WND-040 to WND-044)
+
+See `docs/TICKETS.md` for full ticket details and `docs/ARCHITECTURE.md` for system design.
 
 ## Key Configuration
 
