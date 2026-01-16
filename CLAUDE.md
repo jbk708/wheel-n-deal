@@ -17,7 +17,14 @@ Follow this workflow for all ticket development:
 3. **Write Tests**: Write tests against the stubs (tests will fail initially)
 4. **Implement**: Fill in the implementation
 5. **Verify**: Run tests to confirm implementation is correct
-6. **Update Ticket**: Mark ticket complete in `TICKETS.md`
+6. **Pre-PR Checks**: Before creating a PR, run these commands from `backend/`:
+   ```bash
+   uv run ruff check . --fix   # Fix linting issues
+   uv run ruff format .        # Format code
+   uv run ty check             # Type check
+   uv run pytest               # Run tests
+   ```
+7. **Update Ticket**: Mark ticket complete in `TICKETS.md`
 
 ### Conventions
 
