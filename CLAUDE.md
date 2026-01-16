@@ -2,11 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Branch Strategy
+
+- **main**: Production-ready code only
+- **dev**: Integration branch for active development (permanent)
+- **feature branches**: Created from `dev`, merged back to `dev`
+
 ## Ticket Development Workflow
 
 Follow this workflow for all ticket development:
 
-1. **Branch**: Create a feature branch from `main`
+1. **Branch**: Create a feature branch from `dev`
 2. **Stub**: Create function/class stubs with signatures and docstrings
 3. **Write Tests**: Write tests against the stubs (tests will fail initially)
 4. **Implement**: Fill in the implementation
