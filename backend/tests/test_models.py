@@ -3,12 +3,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from models import (
     Base,
     PriceHistory,
     Product,
+    User,
     get_db_engine,
     get_db_session,
     init_db,
@@ -24,6 +26,84 @@ def test_db():
     session = session_factory()
     yield session
     session.close()
+
+
+def test_user_model_with_signal_phone(test_db):
+    """Test creating a User with Signal phone number."""
+    user = User(signal_phone="+1234567890", signal_username="testuser")
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(signal_phone="+1234567890").first()
+
+    assert queried_user is not None
+    assert queried_user.signal_phone == "+1234567890"
+    assert queried_user.signal_username == "testuser"
+    assert queried_user.email is None
+    assert queried_user.password_hash is None
+    assert isinstance(queried_user.created_at, datetime)
+
+
+def test_user_model_with_email(test_db):
+    """Test creating a User with email and password for web login."""
+    user = User(email="test@example.com", password_hash="hashed_password_here")  # noqa: S106
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(email="test@example.com").first()
+
+    assert queried_user is not None
+    assert queried_user.email == "test@example.com"
+    assert queried_user.password_hash == "hashed_password_here"
+    assert queried_user.signal_phone is None
+    assert isinstance(queried_user.created_at, datetime)
+
+
+def test_user_model_with_both_signal_and_email(test_db):
+    """Test creating a User with both Signal and email credentials."""
+    user = User(
+        signal_phone="+1234567890",
+        signal_username="testuser",
+        email="test@example.com",
+        password_hash="hashed_password_here",  # noqa: S106
+    )
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(signal_phone="+1234567890").first()
+
+    assert queried_user is not None
+    assert queried_user.signal_phone == "+1234567890"
+    assert queried_user.email == "test@example.com"
+
+
+def test_user_signal_phone_unique_constraint(test_db):
+    """Test that signal_phone must be unique."""
+    user1 = User(signal_phone="+1234567890")
+    test_db.add(user1)
+    test_db.commit()
+
+    user2 = User(signal_phone="+1234567890")
+    test_db.add(user2)
+
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+
+
+def test_user_email_unique_constraint(test_db):
+    """Test that email must be unique."""
+    # Need a fresh session for this test due to previous rollback state
+    test_db.rollback()
+
+    user1 = User(email="test@example.com")
+    test_db.add(user1)
+    test_db.commit()
+
+    user2 = User(email="test@example.com")
+    test_db.add(user2)
+
+    with pytest.raises(IntegrityError):
+        test_db.commit()
 
 
 def test_product_model(test_db):
