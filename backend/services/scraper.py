@@ -9,6 +9,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
+
 from utils.logging import get_logger
 from utils.monitoring import ScraperMetrics
 
@@ -311,8 +312,8 @@ def scrape_product_info(url: str):
             logger.error(f"Timeout while scraping {url}")
             return {"title": "Error: Page load timeout", "price": "Price not found", "url": url}
         except Exception as e:
-            logger.error(f"Error scraping {url}: {str(e)}", exc_info=True)
-            return {"title": f"Error: {str(e)}", "price": "Price not found", "url": url}
+            logger.error(f"Error scraping {url}: {e!s}", exc_info=True)
+            return {"title": f"Error: {e!s}", "price": "Price not found", "url": url}
         finally:
             # Close the browser
             logger.debug("Closing browser")

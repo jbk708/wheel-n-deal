@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from tasks.price_check import check_price
 
 # Mock product info data

@@ -2,6 +2,9 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from models import (
     Base,
     PriceHistory,
@@ -10,8 +13,6 @@ from models import (
     get_db_session,
     init_db,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 
 @pytest.fixture

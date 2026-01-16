@@ -1,14 +1,15 @@
 from datetime import datetime
 from typing import List, Optional
 
-from config import settings
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
-from pydantic import BaseModel
 from services.notification import send_signal_message_to_group
 from services.scraper import scrape_product_info
-from sqlalchemy.orm import Session
 from utils.logging import get_logger
 from utils.monitoring import PRICE_ALERTS_SENT, TRACKED_PRODUCTS
 
@@ -117,8 +118,8 @@ async def track_product(product: Product, db: Session = db_dependency):
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Error tracking product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error tracking product: {str(e)}") from e
+        logger.error(f"Error tracking product: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error tracking product: {e!s}") from e
 
 
 @router.get("/products", response_model=List[ProductResponse])
@@ -161,9 +162,9 @@ async def get_tracked_products(db: Session = db_dependency):
         return response
 
     except Exception as e:
-        logger.error(f"Error retrieving tracked products: {str(e)}", exc_info=True)
+        logger.error(f"Error retrieving tracked products: {e!s}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Error retrieving tracked products: {str(e)}"
+            status_code=500, detail=f"Error retrieving tracked products: {e!s}"
         ) from e
 
 
@@ -206,8 +207,8 @@ async def get_product(product_id: int, db: Session = db_dependency):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving product: {str(e)}") from e
+        logger.error(f"Error retrieving product: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving product: {e!s}") from e
 
 
 @router.delete("/products/{product_id}")
@@ -236,8 +237,8 @@ async def delete_product(product_id: int, db: Session = db_dependency):
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error deleting product: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error deleting product: {str(e)}") from e
+        logger.error(f"Error deleting product: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error deleting product: {e!s}") from e
 
 
 @router.post("/check-prices")
@@ -297,9 +298,7 @@ async def check_prices(db: Session = db_dependency):
                     PRICE_ALERTS_SENT.inc()
 
             except Exception as e:
-                logger.error(
-                    f"Error checking price for product {product.id}: {str(e)}", exc_info=True
-                )
+                logger.error(f"Error checking price for product {product.id}: {e!s}", exc_info=True)
                 continue
 
         logger.info(f"Price check completed. Sent {notifications_sent} notifications.")
@@ -308,5 +307,5 @@ async def check_prices(db: Session = db_dependency):
         }
 
     except Exception as e:
-        logger.error(f"Error checking prices: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error checking prices: {str(e)}") from e
+        logger.error(f"Error checking prices: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error checking prices: {e!s}") from e

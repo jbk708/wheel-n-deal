@@ -155,7 +155,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Configure ruff fully | `pyproject.toml` | Remove pylint, use ruff as sole linter/formatter |
 | Add ty type checking | `pyproject.toml` | Add ty for static type analysis |
 | Set up Alembic | `backend/` | Initialize alembic, create initial migration |
 | Consolidate models | `models.py`, `models/database.py` | Keep one, delete duplicate |

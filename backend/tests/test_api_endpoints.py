@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+
 from routers.tracker import get_tracked_products, track_product
 
 

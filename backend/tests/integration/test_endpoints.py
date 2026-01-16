@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+
 from routers.tracker import router
 
 # Create a test FastAPI app with just the tracker router

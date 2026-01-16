@@ -1,6 +1,7 @@
 import random
 
 from celery import shared_task
+
 from models import PriceHistory, Product, get_db_session
 from services.notification import send_signal_message
 from services.scraper import scrape_product_info
@@ -52,12 +53,12 @@ def check_price(url: str, target_price: float):
                 print(f"Product with URL {url} not found in the database.")
         except Exception as e:
             db.rollback()
-            print(f"Database error: {str(e)}")
+            print(f"Database error: {e!s}")
         finally:
             db.close()
     except Exception as e:
         # Log the exception (or notify the user about the failure)
-        print(f"Error occurred while checking price for {url}: {str(e)}")
+        print(f"Error occurred while checking price for {url}: {e!s}")
 
     # Add randomness to the next task schedule: + or - 10 minutes from the hour
     random_offset = random.randint(-600, 600)

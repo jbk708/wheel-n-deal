@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from services.listener import (
     handle_help_message,
     handle_list_tracked_items,

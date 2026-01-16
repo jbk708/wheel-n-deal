@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+
 from routers.tracker import Product, get_tracked_products, track_product
 
 # Mock data for the product_info returned by scrape_product_info
@@ -58,7 +59,7 @@ async def test_track_product_success(
     # Verify that send_signal_message was called
     assert mock_send_signal.call_count == 1
     # Get the actual arguments
-    args, kwargs = mock_send_signal.call_args
+    args, _ = mock_send_signal.call_args
     # Check that the second argument (message) contains the expected text
     assert "Product is now being tracked" in args[1]
     assert mock_product_info["title"] in args[1]

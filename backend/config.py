@@ -71,6 +71,6 @@ if settings.DEBUG:
     config_dict = {k: v for k, v in settings.dict().items() if not k.startswith("_")}
     # Hide sensitive information
     for key in ["SECRET_KEY", "DATABASE_URL", "SIGNAL_PHONE_NUMBER", "SIGNAL_GROUP_ID"]:
-        if key in config_dict and config_dict[key]:
+        if config_dict.get(key):
             config_dict[key] = "********"
     print(json.dumps(config_dict, indent=2))
