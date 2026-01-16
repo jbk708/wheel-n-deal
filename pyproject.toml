@@ -43,4 +43,22 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 skip-magic-trailing-comma = false
-docstring-code-format = true 
+docstring-code-format = true
+
+[tool.ty.environment]
+python-version = "3.10"
+python = "backend/.venv"
+
+[tool.ty.rules]
+# Treat deprecation warnings as warnings (not errors) during gradual adoption
+deprecated = "warn"
+
+[tool.ty.src]
+include = ["backend"]
+
+[[tool.ty.overrides]]
+# FastAPI/Starlette add_middleware has incorrect type stubs
+include = ["backend/main.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
