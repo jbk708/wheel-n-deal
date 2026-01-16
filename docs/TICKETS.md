@@ -4,15 +4,13 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-026 | Implement user registration/login endpoints (replace fake_users_db) | In Progress | feat-WND-026-user-registration |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 1: User Identity Foundation** | | |
-| WND-024 | Add User model with Signal phone, username, created_at | High |
-| WND-025 | Add user_id FK to Product, remove URL unique constraint | High |
-| WND-026 | Implement user registration/login endpoints (replace fake_users_db) | High |
 | WND-027 | Update tracker API to filter products by authenticated user | High |
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
 | WND-028 | Parse sender phone/username from signal-cli JSON output | High |
@@ -39,6 +37,8 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-025 | Add user_id FK to Product, enable per-user tracking | 2026-01-16 | #29 |
+| WND-024 | Add User model with Signal phone, username, created_at | 2026-01-16 | #28 |
 | WND-023 | Top-level file cleanup and setup script updates | 2026-01-16 | #25 |
 | WND-021 | Codebase consolidation and simplification review | 2026-01-16 | #23 |
 | WND-020 | Update setup instructions | 2026-01-16 | #22 |
