@@ -231,9 +231,28 @@ def listen_to_group() -> None:
                 time.sleep(5)
                 continue
 
-            logger.info(f"Message received from group: {output[:100]}...")
-            message = output.lower()
-            parsed_command = parse_message(message)
+            logger.info("Message received from group: %s...", output[:100])
+
+            # Extract the message body from signal-cli output
+            # Format: "Body: <message>" or the message may be on a line by itself
+            message_body = None
+            for line in output.split("\n"):
+                line = line.strip()
+                if line.startswith("Body:"):
+                    message_body = line[5:].strip()
+                    break
+                # Also check for lines that look like commands (start with !)
+                if line.startswith("!"):
+                    message_body = line
+                    break
+
+            if not message_body:
+                logger.debug("No message body found in output")
+                time.sleep(5)
+                continue
+
+            logger.debug("Extracted message body: %s", message_body)
+            parsed_command = parse_message(message_body)
             cmd = parsed_command["command"]
 
             if cmd == "ignore":
