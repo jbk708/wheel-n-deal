@@ -75,6 +75,18 @@ def get_db_session(engine=None):
 def init_db():
     """
     Initialize the database by creating all tables.
+
+    Note: This function uses create_all() for backward compatibility.
+    For new deployments, prefer using Alembic migrations:
+        alembic upgrade head
     """
+    import warnings
+
+    warnings.warn(
+        "init_db() uses create_all() which may not reflect all migrations. "
+        "Consider using 'alembic upgrade head' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     engine = get_db_engine()
     Base.metadata.create_all(bind=engine)
