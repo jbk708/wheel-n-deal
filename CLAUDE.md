@@ -154,19 +154,10 @@ From the project root:
 
 ### Known Issues
 
-**Medium Priority**:
-- Integration tests in `tests/integration/` are skipped
-
 **Low Priority**:
 - Hardcoded metrics port 8001 in `main.py` (should use `settings.METRICS_PORT`)
 - Static user agent in scraper (easily detected)
 - No database connection pooling configuration
-
-### Technical Debt Backlog
-
-| Issue | Location | Fix |
-|-------|----------|-----|
-| Re-enable integration tests | `tests/integration/` | Debug and fix skipped tests |
 
 See `ARCHITECTURE.md` for system design details.
 

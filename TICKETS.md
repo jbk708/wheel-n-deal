@@ -4,13 +4,11 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-007 | Standardize price type handling (string vs float) | In Progress | feat-WND-007-price-type-standardization |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-008 | Re-enable and fix skipped integration tests | Medium |
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
 | WND-010 | Add database connection pooling configuration | Low |
 | WND-014 | Fix type errors reported by ty (4 errors) | Medium |
@@ -27,6 +25,8 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-008 | Re-enable and fix skipped integration tests | 2026-01-16 | #13 |
+| WND-007 | Standardize price type handling (string vs float) | 2026-01-16 | #12 |
 | WND-006 | Replace print() with logger in price_check.py | 2026-01-16 | #11 |
 | WND-004 | Consolidate duplicate model definitions | 2026-01-16 | #10 |
 | WND-003 | Fix CORS to restrict allowed origins | 2026-01-16 | #9 |
