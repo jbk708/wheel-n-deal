@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -25,22 +25,22 @@ db_dependency = Depends(get_db_session)
 
 class Product(BaseModel):
     url: str
-    target_price: Optional[float] = None
+    target_price: float | None = None
 
 
 class ProductResponse(BaseModel):
     id: int
     url: str
     title: str
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    target_price: Optional[float] = None
-    current_price: Optional[float] = None
+    description: str | None = None
+    image_url: str | None = None
+    target_price: float | None = None
+    current_price: float | None = None
     created_at: datetime
     updated_at: datetime
 
 
-def get_latest_price(db: Session, product_id: int) -> Optional[float]:
+def get_latest_price(db: Session, product_id: int) -> float | None:
     """Get the latest price for a product from price history."""
     latest_price = (
         db.query(PriceHistory)
@@ -51,7 +51,7 @@ def get_latest_price(db: Session, product_id: int) -> Optional[float]:
     return latest_price.price if latest_price else None
 
 
-def build_product_response(product: DBProduct, current_price: Optional[float]) -> dict:
+def build_product_response(product: DBProduct, current_price: float | None) -> dict:
     """Build a product response dictionary from a database product."""
     return {
         "id": product.id,
