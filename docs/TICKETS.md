@@ -9,13 +9,13 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-020 | Update setup instructions | Low |
 | WND-021 | Codebase consolidation and simplification review | Low |
 
 ## Completed
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-020 | Update setup instructions | 2026-01-16 | #22 |
 | WND-019 | Remove unused rate_limit wrapper function | 2026-01-16 | #21 |
 | WND-018 | Extract helper functions in tracker.py | 2026-01-16 | #20 |
 | WND-017 | Consolidate duplicate test files | 2026-01-16 | #19 |
