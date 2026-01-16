@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from config import settings
 from utils.logging import get_logger
 
 # Setup logger
@@ -17,13 +18,13 @@ logger = get_logger("security")
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings
-SECRET_KEY = "CHANGE_THIS_TO_A_SECURE_SECRET_KEY"  # Should be loaded from environment variables
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# JWT settings from config
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# OAuth2 scheme - tokenUrl matches the auth router endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
