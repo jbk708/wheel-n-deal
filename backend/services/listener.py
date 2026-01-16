@@ -2,13 +2,11 @@ import re
 import subprocess
 import time
 
-from fastapi import HTTPException
-
 from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
-from routers.tracker import Product, track_product
 from services.notification import send_signal_message_to_group
+from services.scraper import scrape_product_info
 from utils.logging import get_logger
 from utils.monitoring import TRACKED_PRODUCTS
 
@@ -31,11 +29,15 @@ def parse_message(message: str):
     if "track" in message.lower():
         # Extract URL and optional target price using regex
         url_match = re.search(r"(https?://\S+)", message)
-        price_match = re.search(r"(\d+(\.\d{1,2})?)", message)
 
         if url_match:
             url = url_match.group(0)
-            target_price = float(price_match.group(0)) if price_match else None
+            # Look for target price AFTER the URL - must be a standalone number
+            # Only match price if explicitly provided (e.g., "track <url> 15.99")
+            after_url = message[url_match.end() :]
+            # Match a price that's clearly separate: whitespace + number (with optional decimals)
+            price_match = re.search(r"^\s+(\d+(?:\.\d{1,2})?)\s*$", after_url)
+            target_price = float(price_match.group(1)) if price_match else None
             logger.info(f"Parsed track command: URL={url}, target_price={target_price}")
             return {"command": "track", "url": url, "target_price": target_price}
         else:
@@ -199,25 +201,58 @@ def listen_to_group():
                     parsed_command = parse_message(message)
 
                     if parsed_command["command"] == "track":
-                        # Call track_product with parsed URL and target price
-                        product = Product(
-                            url=parsed_command["url"],
-                            target_price=parsed_command["target_price"],
-                        )
+                        url = parsed_command["url"]
+                        target_price = parsed_command["target_price"]
 
                         try:
-                            # Call the API function to track the product
-                            logger.info(f"Tracking product: {product.url}")
-                            track_product(product)
+                            logger.info(f"Tracking product: {url}")
+                            db = get_db_session()
+
+                            # Check if already tracked
+                            existing = db.query(DBProduct).filter(DBProduct.url == url).first()
+                            if existing:
+                                send_signal_message_to_group(
+                                    group_id, f"Product is already being tracked: {url}"
+                                )
+                                db.close()
+                                continue
+
+                            # Scrape product info
+                            product_info = scrape_product_info(url)
+                            if not product_info:
+                                send_signal_message_to_group(
+                                    group_id, f"Failed to scrape product info for: {url}"
+                                )
+                                db.close()
+                                continue
+
+                            current_price = product_info.get("price_float")
+
+                            # Set target price to 90% of current if not provided
+                            if target_price is None and current_price:
+                                target_price = round(current_price * 0.9, 2)
+
+                            # Create product in database
+                            db_product = DBProduct(
+                                url=url,
+                                title=product_info.get("title", "Unknown"),
+                                target_price=target_price or 0,
+                                user_id=1,  # Default user for Signal tracking
+                            )
+                            db.add(db_product)
+                            db.commit()
 
                             send_signal_message_to_group(
                                 group_id,
-                                f"Product is now being tracked: {product.url}. Target price: {product.target_price}",
+                                f"Now tracking: {product_info.get('title', url)}\n"
+                                f"Current price: ${current_price:.2f}\n"
+                                f"Target price: ${target_price:.2f}",
                             )
-                        except HTTPException as e:
-                            logger.error(f"Failed to track product: {e.detail!s}")
+                            db.close()
+                        except Exception as e:
+                            logger.error(f"Failed to track product: {e!s}")
                             send_signal_message_to_group(
-                                group_id, f"Failed to track product: {e.detail!s}"
+                                group_id, f"Failed to track product: {e!s}"
                             )
 
                     elif parsed_command["command"] == "status":
