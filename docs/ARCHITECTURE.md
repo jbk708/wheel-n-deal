@@ -1,6 +1,6 @@
 # Architecture
 
-## System Overview
+## Current System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -16,8 +16,8 @@
 ├─────────────────────┬─────────────────────┬─────────────────────────────────┤
 │   routers/          │   services/         │   tasks/                        │
 │   tracker.py        │   scraper.py        │   price_check.py                │
-│   (API endpoints)   │   listener.py       │   (Celery background tasks)     │
-│                     │   notification.py   │                                 │
+│   auth.py           │   listener.py       │   (Celery background tasks)     │
+│   (API endpoints)   │   notification.py   │                                 │
 └─────────┬───────────┴─────────┬───────────┴───────────────┬─────────────────┘
           │                     │                           │
           ▼                     ▼                           ▼
@@ -84,13 +84,13 @@ PriceHistory
 └── product (relationship)
 ```
 
-**models/database.py** - Database initialization with metrics (duplicate models - technical debt)
+**models/database.py** - Database initialization with connection pooling and metrics
 
 ### Utilities
 
 - **logging.py** - Loguru configuration with file rotation
 - **monitoring.py** - Prometheus metrics and middleware
-- **security.py** - JWT auth, rate limiting, IP blocking (partially wired)
+- **security.py** - JWT auth, rate limiting, IP blocking
 
 ### Configuration (`config.py`)
 
@@ -137,3 +137,137 @@ Pydantic settings loaded from environment variables and `.env`:
 - **Celery over APScheduler**: Distributed task execution, Redis persistence
 - **Signal over email/SMS**: Free, encrypted, group chat support
 - **SQLite dev / Postgres prod**: Zero-config development, scalable production
+
+---
+
+## Future Architecture
+
+### Phase 1-2: Per-User Tracking
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Interfaces                                 │
+├───────────────────┬─────────────────────────┬───────────────────────────────┤
+│     REST API      │    React Web Frontend   │      Signal Group Chat        │
+│  (FastAPI :8000)  │      (Vite :3000)       │    (! prefix commands)        │
+└─────────┬─────────┴───────────┬─────────────┴─────────────┬─────────────────┘
+          │                     │                           │
+          │                     │                           ▼
+          │                     │              ┌────────────────────────────┐
+          │                     │              │  listener.py (enhanced)    │
+          │                     │              │  - Parse sender phone      │
+          │                     │              │  - !track, !list, !stop    │
+          │                     │              │  - Per-user command scope  │
+          │                     │              └─────────────┬──────────────┘
+          │                     │                            │
+          ▼                     ▼                            ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Backend Services (user-aware)                        │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Database Schema                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  User                          Product                    PriceHistory      │
+│  ├── id                        ├── id                     ├── id            │
+│  ├── signal_phone (unique)     ├── user_id (FK) ────────► │                 │
+│  ├── signal_username           ├── title, url             ├── product_id    │
+│  ├── email (nullable)          ├── target_price           ├── price         │
+│  ├── password_hash (nullable)  ├── created_at             └── timestamp     │
+│  └── created_at                └── updated_at                               │
+│                                                                             │
+│  Note: Same URL can be tracked by multiple users (composite unique on       │
+│        user_id + url instead of url alone)                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Changes:**
+- `User` model links Signal phone numbers to accounts
+- Products belong to users via `user_id` foreign key
+- Signal listener parses sender info and auto-creates users
+- Commands require `!` prefix: `!track`, `!list`, `!stop`, `!help`, `!status`
+- Each user sees only their own tracked products
+
+### Phase 3: React Web Interface
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   ├── ProductCard.tsx       # Product display with price info
+│   │   ├── PriceChart.tsx        # Price history visualization
+│   │   └── AddProductForm.tsx    # URL input with validation
+│   ├── pages/
+│   │   ├── Login.tsx             # JWT authentication
+│   │   ├── Register.tsx          # New user signup
+│   │   ├── Dashboard.tsx         # Product list overview
+│   │   └── ProductDetail.tsx     # Single product view
+│   ├── api/
+│   │   └── client.ts             # Axios/fetch wrapper for backend
+│   └── App.tsx                   # React Router setup
+├── package.json
+└── vite.config.ts
+```
+
+**Tech Stack:**
+- React 18+ with TypeScript
+- Vite for build tooling
+- TailwindCSS for styling
+- React Router for navigation
+- Recharts or Chart.js for price history graphs
+
+### Phase 4: Signal Bot Framework (Monorepo)
+
+```
+wheel-n-deal/
+├── packages/
+│   ├── signal-bot-core/              # Reusable Signal bot framework
+│   │   ├── src/
+│   │   │   ├── bot.py                # SignalBot base class
+│   │   │   ├── message.py            # Message parsing utilities
+│   │   │   ├── command.py            # Command registration interface
+│   │   │   └── plugin.py             # Plugin base class
+│   │   └── pyproject.toml
+│   │
+│   └── wheel-n-deal/                 # Price tracking plugin
+│       ├── src/
+│       │   ├── plugin.py             # WheelNDealPlugin(Plugin)
+│       │   ├── commands/
+│       │   │   ├── track.py          # !track command
+│       │   │   ├── list.py           # !list command
+│       │   │   └── stop.py           # !stop command
+│       │   ├── services/
+│       │   │   ├── scraper.py
+│       │   │   └── notification.py
+│       │   └── models.py
+│       └── pyproject.toml
+│
+├── frontend/                         # React web UI
+├── docker-compose.yml
+└── pyproject.toml                    # Workspace root
+```
+
+**Plugin Interface:**
+```python
+# signal-bot-core/plugin.py
+class Plugin(ABC):
+    @abstractmethod
+    def get_commands(self) -> list[Command]: ...
+
+    @abstractmethod
+    def on_load(self, bot: SignalBot) -> None: ...
+
+# Command registration
+class Command:
+    name: str           # e.g., "track"
+    prefix: str         # e.g., "!"
+    handler: Callable   # async def handle(ctx: Context) -> str
+    help_text: str      # Shown in !help
+```
+
+**Benefits:**
+- Clean separation of bot infrastructure from domain logic
+- Other plugins can be added (reminders, polls, etc.)
+- Shared message parsing, user management, rate limiting
+- wheel-n-deal becomes one of potentially many bot capabilities
