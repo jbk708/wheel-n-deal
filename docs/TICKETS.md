@@ -4,7 +4,6 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-027 | Update tracker API to filter products by authenticated user | In Progress | feat-WND-027-filter-products-by-user |
 
 ## Backlog
 
@@ -35,6 +34,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-027 | Update tracker API to filter products by authenticated user | 2026-01-16 | #32 |
 | WND-026 | Implement user registration/login endpoints (replace fake_users_db) | 2026-01-16 | #30 |
 | WND-025 | Add user_id FK to Product, enable per-user tracking | 2026-01-16 | #29 |
 | WND-024 | Add User model with Signal phone, username, created_at | 2026-01-16 | #28 |
