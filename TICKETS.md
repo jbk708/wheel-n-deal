@@ -4,14 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-003 | Fix CORS to restrict allowed origins | In Progress | feat-WND-003-cors-fix |
+| WND-004 | Consolidate duplicate model definitions | In Progress | feat-WND-004-consolidate-models |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-004 | Consolidate duplicate model definitions | Medium |
-| WND-005 | Fix deprecated SQLAlchemy import in models/database.py | Medium |
 | WND-006 | Replace print() with logger in price_check.py | Medium |
 | WND-007 | Standardize price type handling (string vs float) | Medium |
 | WND-008 | Re-enable and fix skipped integration tests | Medium |
@@ -23,11 +21,13 @@
 | WND-017 | Consolidate duplicate test files (test_tracker.py, test_api_endpoints.py) | Low |
 | WND-018 | Extract helper functions in tracker.py to reduce duplication | Low |
 | WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
+| WND-020 | Update setup instructions | Low |
 
 ## Completed
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-003 | Fix CORS to restrict allowed origins | 2026-01-16 | #9 |
 | WND-002 | Wire security routes to API (auth, rate limiting) | 2026-01-16 | #8 |
 | WND-001 | Set up Alembic migrations | 2026-01-16 | #7 |
 | WND-013 | Add ty for type checking | 2026-01-16 | #6 |
