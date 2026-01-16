@@ -5,7 +5,7 @@ description = "Backend for wheel-n-deal, a package for tracking flash sales and 
 authors = [{ name = "Jonathan Kirkland", email = "jbkirkland708@gmail.com" }]
 license = { text = "GNU General Public License v3.0" }
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.31.1",
