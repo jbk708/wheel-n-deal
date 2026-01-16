@@ -23,18 +23,17 @@ RUN curl -L -o signal-cli.tar.gz https://github.com/AsamK/signal-cli/releases/do
     ln -sf /opt/signal-cli-0.11.3/bin/signal-cli /usr/local/bin/ && \
     rm signal-cli.tar.gz
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.create false
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Set working directory
 WORKDIR /app
 
-# Copy Poetry configuration files
-COPY pyproject.toml poetry.lock ./
+# Copy project files
+COPY pyproject.toml uv.lock ./
 
-# Install dependencies
-RUN poetry install --no-root --without dev
+# Install dependencies (production only)
+RUN uv sync --frozen --no-dev
 
 # Copy application code
 COPY . .
@@ -49,4 +48,4 @@ RUN mkdir -p /app/logs && \
 EXPOSE 8000
 
 # Set default command
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -50,27 +50,33 @@ All commands should be run from the `backend/` directory:
 
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
 # Run API server (development)
-poetry run uvicorn main:app --reload
+uv run uvicorn main:app --reload
 
 # Run Celery worker (requires Redis)
-poetry run celery -A celery_app worker --loglevel=info
+uv run celery -A celery_app worker --loglevel=info
 
 # Run tests with coverage
-poetry run pytest
+uv run pytest
 
 # Run a single test file
-poetry run pytest tests/test_scraper.py
+uv run pytest tests/test_scraper.py
 
 # Run a single test
-poetry run pytest tests/test_scraper.py::test_function_name -v
+uv run pytest tests/test_scraper.py::test_function_name -v
 
 # Linting and formatting
-ruff check .
-ruff check . --fix
-ruff format .
+uv run ruff check .
+uv run ruff check . --fix
+uv run ruff format .
+
+# Add a dependency
+uv add <package>
+
+# Add a dev dependency
+uv add --group dev <package>
 ```
 
 ## Docker Commands
@@ -149,7 +155,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Migrate to uv | `backend/pyproject.toml` | Replace Poetry with uv for env/package management |
 | Configure ruff fully | `pyproject.toml` | Remove pylint, use ruff as sole linter/formatter |
 | Add ty type checking | `pyproject.toml` | Add ty for static type analysis |
 | Set up Alembic | `backend/` | Initialize alembic, create initial migration |

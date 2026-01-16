@@ -4,13 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| | | | |
+| WND-011 | Migrate from Poetry to uv for package/env management | In Progress | `feat-WND-011-uv-migration` |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-011 | Migrate from Poetry to uv for package/env management | High |
 | WND-012 | Configure ruff as sole linter/formatter (remove pylint) | High |
 | WND-013 | Add ty for type checking | High |
 | WND-001 | Set up Alembic migrations | High |

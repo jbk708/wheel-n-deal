@@ -19,6 +19,7 @@ ignore = [
     "UP006", # Use `list` instead of `List` for type annotation
     "UP007", # Use `X | Y` instead of `Union[X, Y]`
     "UP035", # `typing.List` is deprecated, use `list` instead
+    "UP045", # Use `X | None` instead of `Optional[X]`
 ]
 
 [tool.ruff.lint.isort]
