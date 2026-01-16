@@ -74,11 +74,18 @@ settings = Settings()
 # Log settings in debug mode
 if settings.DEBUG:
     import json
+    import logging
 
-    print(f"=== {settings.APP_NAME} Configuration ===")
+    _logger = logging.getLogger("config")
+    _logger.setLevel(logging.DEBUG)
+    if not _logger.handlers:
+        _handler = logging.StreamHandler()
+        _handler.setFormatter(logging.Formatter("%(levelname)s | %(name)s - %(message)s"))
+        _logger.addHandler(_handler)
+
     config_dict = {k: v for k, v in settings.model_dump().items() if not k.startswith("_")}
     # Hide sensitive information
     for key in ["SECRET_KEY", "DATABASE_URL", "SIGNAL_PHONE_NUMBER", "SIGNAL_GROUP_ID"]:
         if config_dict.get(key):
             config_dict[key] = "********"
-    print(json.dumps(config_dict, indent=2))
+    _logger.debug(f"{settings.APP_NAME} Configuration: {json.dumps(config_dict, indent=2)}")
