@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     create_engine,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
@@ -20,12 +21,33 @@ logger = get_logger("models")
 Base = declarative_base()
 
 
-class Product(Base):
-    __tablename__ = "products"
+class User(Base):
+    """User model for per-user product tracking.
+
+    Users can be created via Signal (signal_phone) or web registration (email/password).
+    Signal users are auto-created when they first send a command.
+    """
+
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    signal_phone = Column(String, unique=True, nullable=True, index=True)
+    signal_username = Column(String, nullable=True)
+    email = Column(String, unique=True, nullable=True, index=True)
+    password_hash = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    products = relationship("Product", back_populates="user", cascade="all, delete-orphan")
+
+
+class Product(Base):
+    __tablename__ = "products"
+    __table_args__ = (UniqueConstraint("user_id", "url", name="uq_user_product_url"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String, index=True)
-    url = Column(String, unique=True, index=True)
+    url = Column(String, index=True)
     description = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
     target_price = Column(Float)
@@ -36,6 +58,7 @@ class Product(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
+    user = relationship("User", back_populates="products")
     price_history = relationship(
         "PriceHistory", back_populates="product", cascade="all, delete-orphan"
     )

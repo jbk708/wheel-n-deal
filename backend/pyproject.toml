@@ -41,6 +41,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "httpx>=0.24.0",
     "ty>=0.0.12",
+    "pre-commit>=4.5.1",
 ]
 
 [build-system]

@@ -3,12 +3,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from models import (
     Base,
     PriceHistory,
     Product,
+    User,
     get_db_engine,
     get_db_session,
     init_db,
@@ -26,10 +28,204 @@ def test_db():
     session.close()
 
 
+def test_user_model_with_signal_phone(test_db):
+    """Test creating a User with Signal phone number."""
+    user = User(signal_phone="+1234567890", signal_username="testuser")
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(signal_phone="+1234567890").first()
+
+    assert queried_user is not None
+    assert queried_user.signal_phone == "+1234567890"
+    assert queried_user.signal_username == "testuser"
+    assert queried_user.email is None
+    assert queried_user.password_hash is None
+    assert isinstance(queried_user.created_at, datetime)
+
+
+def test_user_model_with_email(test_db):
+    """Test creating a User with email and password for web login."""
+    user = User(email="test@example.com", password_hash="hashed_password_here")  # noqa: S106
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(email="test@example.com").first()
+
+    assert queried_user is not None
+    assert queried_user.email == "test@example.com"
+    assert queried_user.password_hash == "hashed_password_here"
+    assert queried_user.signal_phone is None
+    assert isinstance(queried_user.created_at, datetime)
+
+
+def test_user_model_with_both_signal_and_email(test_db):
+    """Test creating a User with both Signal and email credentials."""
+    user = User(
+        signal_phone="+1234567890",
+        signal_username="testuser",
+        email="test@example.com",
+        password_hash="hashed_password_here",  # noqa: S106
+    )
+    test_db.add(user)
+    test_db.commit()
+
+    queried_user = test_db.query(User).filter_by(signal_phone="+1234567890").first()
+
+    assert queried_user is not None
+    assert queried_user.signal_phone == "+1234567890"
+    assert queried_user.email == "test@example.com"
+
+
+def test_user_signal_phone_unique_constraint(test_db):
+    """Test that signal_phone must be unique."""
+    user1 = User(signal_phone="+1234567890")
+    test_db.add(user1)
+    test_db.commit()
+
+    user2 = User(signal_phone="+1234567890")
+    test_db.add(user2)
+
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+
+
+def test_user_email_unique_constraint(test_db):
+    """Test that email must be unique."""
+    # Need a fresh session for this test due to previous rollback state
+    test_db.rollback()
+
+    user1 = User(email="test@example.com")
+    test_db.add(user1)
+    test_db.commit()
+
+    user2 = User(email="test@example.com")
+    test_db.add(user2)
+
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+
+
+def test_user_products_relationship(test_db):
+    """Test the relationship between User and Products."""
+    test_db.rollback()
+
+    user = User(signal_phone="+5555555555")
+    test_db.add(user)
+    test_db.commit()
+
+    # Create products for the user
+    product1 = Product(
+        user_id=user.id,
+        title="Product 1",
+        url="https://example.com/product1",
+        target_price=50.0,
+    )
+    product2 = Product(
+        user_id=user.id,
+        title="Product 2",
+        url="https://example.com/product2",
+        target_price=75.0,
+    )
+    test_db.add(product1)
+    test_db.add(product2)
+    test_db.commit()
+
+    # Query user and check products relationship
+    queried_user = test_db.query(User).filter_by(id=user.id).first()
+    assert len(queried_user.products) == 2
+    assert queried_user.products[0].title == "Product 1"
+    assert queried_user.products[1].title == "Product 2"
+
+
+def test_product_user_relationship(test_db):
+    """Test that Product has a back-reference to User."""
+    user = User(signal_phone="+6666666666")
+    test_db.add(user)
+    test_db.commit()
+
+    product = Product(
+        user_id=user.id,
+        title="Test Product",
+        url="https://example.com/test",
+        target_price=100.0,
+    )
+    test_db.add(product)
+    test_db.commit()
+
+    queried_product = test_db.query(Product).filter_by(id=product.id).first()
+    assert queried_product.user is not None
+    assert queried_product.user.signal_phone == "+6666666666"
+
+
+def test_same_url_different_users_allowed(test_db):
+    """Test that different users can track the same URL."""
+    user1 = User(signal_phone="+7777777777")
+    user2 = User(signal_phone="+8888888888")
+    test_db.add(user1)
+    test_db.add(user2)
+    test_db.commit()
+
+    # Both users track the same URL with different target prices
+    product1 = Product(
+        user_id=user1.id,
+        title="Product",
+        url="https://example.com/same-product",
+        target_price=50.0,
+    )
+    product2 = Product(
+        user_id=user2.id,
+        title="Product",
+        url="https://example.com/same-product",
+        target_price=75.0,
+    )
+    test_db.add(product1)
+    test_db.add(product2)
+    test_db.commit()
+
+    # Both should exist
+    products = test_db.query(Product).filter_by(url="https://example.com/same-product").all()
+    assert len(products) == 2
+    assert products[0].target_price != products[1].target_price
+
+
+def test_same_url_same_user_rejected(test_db):
+    """Test that a user cannot track the same URL twice."""
+    user = User(signal_phone="+9999999999")
+    test_db.add(user)
+    test_db.commit()
+
+    product1 = Product(
+        user_id=user.id,
+        title="Product",
+        url="https://example.com/duplicate",
+        target_price=50.0,
+    )
+    test_db.add(product1)
+    test_db.commit()
+
+    product2 = Product(
+        user_id=user.id,
+        title="Product Again",
+        url="https://example.com/duplicate",
+        target_price=75.0,
+    )
+    test_db.add(product2)
+
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+
+
 def test_product_model(test_db):
     """Test creating a Product model instance."""
+    # Create a user first (products require a user)
+    user = User(signal_phone="+1111111111")
+    test_db.add(user)
+    test_db.commit()
+
     # Create a new product
     product = Product(
+        user_id=user.id,
         title="Test Product",
         url="https://example.com/product",
         target_price=90.0,
@@ -44,6 +240,7 @@ def test_product_model(test_db):
 
     # Assertions
     assert queried_product is not None
+    assert queried_product.user_id == user.id
     assert queried_product.title == "Test Product"
     assert queried_product.url == "https://example.com/product"
     assert queried_product.target_price == 90.0
@@ -53,8 +250,14 @@ def test_product_model(test_db):
 
 def test_price_history_model(test_db):
     """Test creating a PriceHistory model instance."""
+    # Create a user first
+    user = User(signal_phone="+2222222222")
+    test_db.add(user)
+    test_db.commit()
+
     # Create a new product
     product = Product(
+        user_id=user.id,
         title="Test Product",
         url="https://example.com/product",
         target_price=90.0,
@@ -84,10 +287,16 @@ def test_price_history_model(test_db):
     assert isinstance(queried_price_history.timestamp, datetime)
 
 
-def test_relationship(test_db):
+def test_product_price_history_relationship(test_db):
     """Test the relationship between Product and PriceHistory."""
+    # Create a user first
+    user = User(signal_phone="+3333333333")
+    test_db.add(user)
+    test_db.commit()
+
     # Create a new product
     product = Product(
+        user_id=user.id,
         title="Test Product",
         url="https://example.com/product",
         target_price=90.0,
