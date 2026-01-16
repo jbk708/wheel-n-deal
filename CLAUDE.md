@@ -17,15 +17,15 @@ Follow this workflow for all ticket development:
 3. **Write Tests**: Write tests against the stubs (tests will fail initially)
 4. **Implement**: Fill in the implementation
 5. **Verify**: Run tests to confirm implementation is correct
-6. **Pre-PR Checks**: Before creating a PR, run these commands from `backend/`:
+6. **Update Ticket**: Mark ticket complete in `docs/TICKETS.md` (include in PR)
+7. **Pre-PR Checks**: Before creating a PR, run these commands from `backend/`:
    ```bash
    uv run ruff check . --fix   # Fix linting issues
    uv run ruff format .        # Format code
    uv run ty check             # Type check
    uv run pytest               # Run tests
    ```
-7. **Simplify**: Run code simplifier to clean up implementation
-8. **Update Ticket**: Mark ticket complete in `docs/TICKETS.md`
+8. **Simplify**: Run code simplifier as final step before PR
 
 ### Conventions
 

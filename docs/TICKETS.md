@@ -4,14 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-028 | Parse sender phone/username from signal-cli JSON output | In Review | feat-WND-028-parse-signal-sender |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
-| WND-029 | Auto-create User record for new Signal senders | High |
 | WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | High |
 | WND-031 | Scope all commands to sender's own product list | High |
 | WND-032 | Add !me command to show user's Signal identity/stats | Medium |
@@ -34,6 +32,8 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-029 | Auto-create User record for new Signal senders | 2026-01-16 | #37 |
+| WND-028 | Parse sender phone/username from signal-cli JSON output | 2026-01-16 | #36 |
 | WND-027 | Update tracker API to filter products by authenticated user | 2026-01-16 | #32 |
 | WND-026 | Implement user registration/login endpoints (replace fake_users_db) | 2026-01-16 | #30 |
 | WND-025 | Add user_id FK to Product, enable per-user tracking | 2026-01-16 | #29 |
