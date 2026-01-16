@@ -153,9 +153,6 @@ From the project root:
 
 ### Known Issues
 
-**High Priority**:
-- CORS allows all origins (`["*"]`) in `main.py:63`
-
 **Medium Priority**:
 - Duplicate model definitions in `models.py` and `models/database.py`
 - Deprecated import in `models/database.py:13`: uses `sqlalchemy.ext.declarative` instead of `sqlalchemy.orm`

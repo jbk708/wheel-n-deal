@@ -4,13 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| | | | |
+| WND-003 | Fix CORS to restrict allowed origins | In Progress | feat-WND-003-cors-fix |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-003 | Fix CORS to restrict allowed origins | High |
 | WND-004 | Consolidate duplicate model definitions | Medium |
 | WND-005 | Fix deprecated SQLAlchemy import in models/database.py | Medium |
 | WND-006 | Replace print() with logger in price_check.py | Medium |
