@@ -25,7 +25,8 @@ def mock_scraper():
         # Mock the scraper to return a valid product
         mock.return_value = {
             "title": "Test Product",
-            "price": 100.0,
+            "price": "$100.00",
+            "price_float": 100.0,
             "url": "https://example.com/product",
             "description": "A test product",
             "image_url": "https://example.com/image.jpg",

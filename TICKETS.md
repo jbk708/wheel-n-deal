@@ -4,13 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-006 | Replace print() with logger in price_check.py | In Progress | feat-WND-006-logger-price-check |
+| WND-007 | Standardize price type handling (string vs float) | In Progress | feat-WND-007-price-type-standardization |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-007 | Standardize price type handling (string vs float) | Medium |
 | WND-008 | Re-enable and fix skipped integration tests | Medium |
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
 | WND-010 | Add database connection pooling configuration | Low |
@@ -21,11 +20,14 @@
 | WND-018 | Extract helper functions in tracker.py to reduce duplication | Low |
 | WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
 | WND-020 | Update setup instructions | Low |
+| WND-021 | Codebase consolidation and simplification review | Low |
+| WND-022 | Review and fix deprecation warnings for all packages | Medium |
 
 ## Completed
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-006 | Replace print() with logger in price_check.py | 2026-01-16 | #11 |
 | WND-004 | Consolidate duplicate model definitions | 2026-01-16 | #10 |
 | WND-003 | Fix CORS to restrict allowed origins | 2026-01-16 | #9 |
 | WND-002 | Wire security routes to API (auth, rate limiting) | 2026-01-16 | #8 |
