@@ -3,24 +3,17 @@ import subprocess
 import time
 
 from fastapi import HTTPException
-from pydantic import BaseModel
 
 from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
-from routers.tracker import track_product
+from routers.tracker import Product, track_product
 from services.notification import send_signal_message_to_group
 from utils.logging import get_logger
 from utils.monitoring import TRACKED_PRODUCTS
 
 # Setup logger
 logger = get_logger("listener")
-
-
-# Define a simple Product model for incoming commands
-class Product(BaseModel):
-    url: str
-    target_price: float | None = None  # Optional target price
 
 
 def parse_message(message: str):
@@ -118,9 +111,6 @@ def handle_list_tracked_items():
     try:
         products = db.query(DBProduct).all()
 
-        # Update the tracked products metric
-        TRACKED_PRODUCTS.set(len(products))
-
         if not products:
             logger.info("No products are currently being tracked")
             return "No products are currently being tracked."
@@ -161,9 +151,6 @@ def stop_tracking_item(index: int):
         # Get all products
         products = db.query(DBProduct).all()
 
-        # Update the tracked products metric
-        TRACKED_PRODUCTS.set(len(products))
-
         if 0 <= index < len(products):
             product_to_delete = products[index]
 
@@ -171,8 +158,8 @@ def stop_tracking_item(index: int):
             db.delete(product_to_delete)
             db.commit()
 
-            # Update the tracked products metric after deletion
-            TRACKED_PRODUCTS.set(len(products) - 1)
+            # Update the tracked products metric
+            TRACKED_PRODUCTS.dec()
 
             logger.info(f"Stopped tracking product: {product_to_delete.title}")
             return f"Stopped tracking: {product_to_delete.title}."

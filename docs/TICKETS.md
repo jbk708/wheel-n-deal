@@ -4,12 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-021 | Codebase consolidation and simplification review | In Progress | refactor-WND-021-codebase-review |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-021 | Codebase consolidation and simplification review | Low |
 
 ## Completed
 
