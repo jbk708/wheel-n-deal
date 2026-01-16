@@ -12,8 +12,8 @@ from services.listener import (
 
 
 def test_parse_message_track_with_url_and_price():
-    """Test parsing a track message with URL and price."""
-    message = "track https://example.com/product 90.00"
+    """Test parsing a !track message with URL and price."""
+    message = "!track https://example.com/product 90.00"
     result = parse_message(message)
 
     assert result["command"] == "track"
@@ -22,8 +22,8 @@ def test_parse_message_track_with_url_and_price():
 
 
 def test_parse_message_track_with_url_only():
-    """Test parsing a track message with URL only."""
-    message = "track https://example.com/product"
+    """Test parsing a !track message with URL only."""
+    message = "!track https://example.com/product"
     result = parse_message(message)
 
     assert result["command"] == "track"
@@ -32,8 +32,8 @@ def test_parse_message_track_with_url_only():
 
 
 def test_parse_message_track_invalid_url():
-    """Test parsing a track message with invalid URL."""
-    message = "track invalid-url"
+    """Test parsing a !track message with invalid URL."""
+    message = "!track invalid-url"
     result = parse_message(message)
 
     assert result["command"] == "invalid"
@@ -41,32 +41,32 @@ def test_parse_message_track_invalid_url():
 
 
 def test_parse_message_status():
-    """Test parsing a status message."""
-    message = "status"
+    """Test parsing a !status message."""
+    message = "!status"
     result = parse_message(message)
 
     assert result["command"] == "status"
 
 
 def test_parse_message_help():
-    """Test parsing a help message."""
-    message = "help"
+    """Test parsing a !help message."""
+    message = "!help"
     result = parse_message(message)
 
     assert result["command"] == "help"
 
 
 def test_parse_message_list():
-    """Test parsing a list message."""
-    message = "list"
+    """Test parsing a !list message."""
+    message = "!list"
     result = parse_message(message)
 
     assert result["command"] == "list"
 
 
 def test_parse_message_stop_valid():
-    """Test parsing a valid stop message."""
-    message = "stop 1"
+    """Test parsing a valid !stop message."""
+    message = "!stop 1"
     result = parse_message(message)
 
     assert result["command"] == "stop"
@@ -74,21 +74,55 @@ def test_parse_message_stop_valid():
 
 
 def test_parse_message_stop_invalid_format():
-    """Test parsing an invalid stop message (no number)."""
-    message = "stop"
+    """Test parsing an invalid !stop message (no number)."""
+    message = "!stop"
     result = parse_message(message)
 
     assert result["command"] == "invalid"
-    assert "Invalid stop command" in result["message"]
+    assert "Invalid !stop command" in result["message"]
 
 
-def test_parse_message_unknown():
-    """Test parsing an unknown message."""
-    message = "unknown command"
+def test_parse_message_unknown_command():
+    """Test parsing an unknown ! command."""
+    message = "!unknown"
     result = parse_message(message)
 
     assert result["command"] == "invalid"
     assert "Unknown command" in result["message"]
+
+
+def test_parse_message_without_prefix_ignored():
+    """Test that messages without ! prefix are ignored."""
+    message = "track https://example.com/product"
+    result = parse_message(message)
+
+    assert result["command"] == "ignore"
+
+
+def test_parse_message_regular_chat_ignored():
+    """Test that regular chat messages are ignored."""
+    message = "hey, what's up?"
+    result = parse_message(message)
+
+    assert result["command"] == "ignore"
+
+
+def test_parse_message_command_case_insensitive():
+    """Test that commands are case-insensitive."""
+    message = "!TRACK https://example.com/product"
+    result = parse_message(message)
+
+    assert result["command"] == "track"
+    assert result["url"] == "https://example.com/product"
+
+
+def test_parse_message_prefix_with_space():
+    """Test that ! with space before command still works."""
+    message = "! help"
+    result = parse_message(message)
+
+    # Should be ignored since there's a space after !
+    assert result["command"] == "ignore"
 
 
 def test_handle_help_message():
@@ -96,11 +130,11 @@ def test_handle_help_message():
     result = handle_help_message()
 
     assert "Available commands" in result
-    assert "track" in result
-    assert "status" in result
-    assert "list" in result
-    assert "stop" in result
-    assert "help" in result
+    assert "!track" in result
+    assert "!status" in result
+    assert "!list" in result
+    assert "!stop" in result
+    assert "!help" in result
 
 
 @patch("services.listener.get_db_session")
@@ -280,7 +314,7 @@ def test_listen_to_group_track_command(
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
 
     # Set up the mock subprocess run result
-    mock_result = MockSubprocessResult(0, "test-group-id: track https://example.com/product 90.00")
+    mock_result = MockSubprocessResult(0, "test-group-id: !track https://example.com/product 90.00")
     mock_run.return_value = mock_result
 
     # Set up the mock parse_message result
@@ -312,7 +346,7 @@ def test_listen_to_group_track_command(
     # Verify the function calls
     mock_run.assert_called_once()
     mock_parse_message.assert_called_once_with(
-        "test-group-id: track https://example.com/product 90.00"
+        "test-group-id: !track https://example.com/product 90.00"
     )
     mock_scrape.assert_called_once_with("https://example.com/product")
     mock_session.add.assert_called_once()
