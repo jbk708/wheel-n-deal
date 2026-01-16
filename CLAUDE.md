@@ -25,7 +25,7 @@ Follow this workflow for all ticket development:
    uv run pytest               # Run tests
    ```
 7. **Simplify**: Run code simplifier to clean up implementation
-8. **Update Ticket**: Mark ticket complete in `TICKETS.md`
+8. **Update Ticket**: Mark ticket complete in `docs/TICKETS.md`
 
 ### Conventions
 
@@ -46,7 +46,7 @@ Follow this workflow for all ticket development:
 
 ### Ticket Tracking
 
-See `TICKETS.md` for active and completed tickets.
+See `docs/TICKETS.md` for active and completed tickets.
 
 ## Project Overview
 
@@ -155,11 +155,9 @@ From the project root:
 ### Known Issues
 
 **Low Priority**:
-- Hardcoded metrics port 8001 in `main.py` (should use `settings.METRICS_PORT`)
 - Static user agent in scraper (easily detected)
-- No database connection pooling configuration
 
-See `ARCHITECTURE.md` for system design details.
+See `docs/ARCHITECTURE.md` for system design details.
 
 ## Key Configuration
 
