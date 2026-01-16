@@ -20,6 +20,23 @@ logger = get_logger("models")
 Base = declarative_base()
 
 
+class User(Base):
+    """User model for per-user product tracking.
+
+    Users can be created via Signal (signal_phone) or web registration (email/password).
+    Signal users are auto-created when they first send a command.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    signal_phone = Column(String, unique=True, nullable=True, index=True)
+    signal_username = Column(String, nullable=True)
+    email = Column(String, unique=True, nullable=True, index=True)
+    password_hash = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
 class Product(Base):
     __tablename__ = "products"
 
