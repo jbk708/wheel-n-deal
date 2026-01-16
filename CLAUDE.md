@@ -75,6 +75,11 @@ uv run ruff format .
 # Type checking
 uv run ty check
 
+# Database migrations
+uv run alembic upgrade head        # Apply all migrations
+uv run alembic downgrade -1        # Rollback one migration
+uv run alembic revision --autogenerate -m "Description"  # Create new migration
+
 # Add a dependency
 uv add <package>
 
@@ -138,7 +143,6 @@ From the project root:
 ### Known Issues
 
 **High Priority**:
-- No Alembic migrations - database uses `create_all()` directly
 - Security endpoints defined in `utils/security.py` but not wired to routes
 - CORS allows all origins (`["*"]`) in `main.py:63`
 
@@ -158,7 +162,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Set up Alembic | `backend/` | Initialize alembic, create initial migration |
 | Consolidate models | `models.py`, `models/database.py` | Keep one, delete duplicate |
 | Wire security routes | `main.py`, `security.py` | Register auth router, apply rate limiting |
 | Fix deprecated import | `models/database.py:13` | Change to `from sqlalchemy.orm import declarative_base` |
