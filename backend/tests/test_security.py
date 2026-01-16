@@ -8,106 +8,157 @@ from jose import jwt
 from utils.security import (
     ALGORITHM,
     SECRET_KEY,
-    User,
-    authenticate_user,
+    authenticate_user_db,
     block_ip,
     create_access_token,
-    fake_users_db,
+    create_user,
     get_current_active_user,
     get_current_user,
     get_password_hash,
-    get_user,
+    get_user_by_email,
     is_ip_blocked,
     setup_security,
     verify_password,
 )
 
 
-# Test password functions
 def test_password_hashing():
     """Test that password hashing and verification work correctly."""
     password = "testpassword"
     hashed = get_password_hash(password)
 
-    # Verify the hash is different from the original password
     assert hashed != password
-
-    # Verify the password against the hash
     assert verify_password(password, hashed) is True
-
-    # Verify an incorrect password fails
     assert verify_password("wrongpassword", hashed) is False
 
 
-# Test user functions
-def test_get_user():
-    """Test retrieving a user from the database."""
-    # Test with existing user
-    user = get_user(fake_users_db, "admin")
-    assert user is not None
-    assert user.username == "admin"
-    assert user.email == "admin@example.com"
+def test_get_user_by_email():
+    """Test retrieving a user by email from the database."""
+    mock_session = MagicMock()
+    mock_user = MagicMock()
+    mock_user.email = "test@example.com"
 
-    # Test with non-existent user
-    user = get_user(fake_users_db, "nonexistent")
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+
+    user = get_user_by_email(mock_session, "test@example.com")
+    assert user is not None
+    assert user.email == "test@example.com"
+
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+    user = get_user_by_email(mock_session, "nonexistent@example.com")
     assert user is None
 
 
-def test_authenticate_user():
-    """Test user authentication."""
-    # Test with correct credentials
-    user = authenticate_user(fake_users_db, "admin", "adminpassword")
+def test_authenticate_user_db():
+    """Test user authentication against the database."""
+    mock_session = MagicMock()
+    mock_user = MagicMock()
+    mock_user.email = "test@example.com"
+    mock_user.password_hash = get_password_hash("correctpassword")
+
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+
+    user = authenticate_user_db(mock_session, "test@example.com", "correctpassword")
     assert user is not None
-    assert user.username == "admin"
+    assert user.email == "test@example.com"
 
-    # Test with incorrect password
-    user = authenticate_user(fake_users_db, "admin", "wrongpassword")
-    assert user is False
+    user = authenticate_user_db(mock_session, "test@example.com", "wrongpassword")
+    assert user is None
 
-    # Test with non-existent user
-    user = authenticate_user(fake_users_db, "nonexistent", "password")
-    assert user is False
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+    user = authenticate_user_db(mock_session, "nonexistent@example.com", "password")
+    assert user is None
 
 
-# Test token functions
+def test_authenticate_user_db_no_password():
+    """Test authentication fails for users without password (Signal-only users)."""
+    mock_session = MagicMock()
+    mock_user = MagicMock()
+    mock_user.email = "signal@example.com"
+    mock_user.password_hash = None
+
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+
+    user = authenticate_user_db(mock_session, "signal@example.com", "anypassword")
+    assert user is None
+
+
+def test_create_user():
+    """Test creating a new user in the database."""
+    mock_session = MagicMock()
+
+    create_user(mock_session, "new@example.com", "password123")
+
+    mock_session.add.assert_called_once()
+    mock_session.commit.assert_called_once()
+    mock_session.refresh.assert_called_once()
+
+    added_user = mock_session.add.call_args[0][0]
+    assert added_user.email == "new@example.com"
+    assert added_user.password_hash is not None
+    assert verify_password("password123", added_user.password_hash)
+
+
 def test_create_access_token():
     """Test creating an access token."""
-    data = {"sub": "testuser"}
+    data = {"sub": "test@example.com"}
 
-    # Test with default expiry
     token = create_access_token(data)
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    assert payload["sub"] == "testuser"
+    assert payload["sub"] == "test@example.com"
     assert "exp" in payload
 
-    # Test with custom expiry
     token = create_access_token(data, expires_delta=timedelta(minutes=30))
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    assert payload["sub"] == "testuser"
+    assert payload["sub"] == "test@example.com"
     assert "exp" in payload
 
 
 @pytest.mark.asyncio
 async def test_get_current_user():
     """Test getting the current user from a token."""
-    # Create a valid token
-    token = create_access_token({"sub": "admin"})
+    mock_user = MagicMock()
+    mock_user.email = "test@example.com"
 
-    # Mock the Depends function to return our token
-    with patch("utils.security.oauth2_scheme", return_value=token):
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+
+    token = create_access_token({"sub": "test@example.com"})
+
+    with (
+        patch("utils.security.oauth2_scheme", return_value=token),
+        patch("utils.security.get_db_session", return_value=mock_session),
+    ):
         user = await get_current_user(token)
         assert user is not None
-        assert user.username == "admin"
+        assert user.email == "test@example.com"
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_invalid_token():
     """Test getting the current user with an invalid token."""
-    # Create an invalid token
     token = "invalid_token"
 
-    # Mock the Depends function to return our token
     with patch("utils.security.oauth2_scheme", return_value=token):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(token)
+
+        assert exc_info.value.status_code == 401
+        assert "Could not validate credentials" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_user_not_found():
+    """Test getting a user that doesn't exist in the database."""
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    token = create_access_token({"sub": "nonexistent@example.com"})
+
+    with (
+        patch("utils.security.oauth2_scheme", return_value=token),
+        patch("utils.security.get_db_session", return_value=mock_session),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(token)
 
@@ -118,67 +169,45 @@ async def test_get_current_user_invalid_token():
 @pytest.mark.asyncio
 async def test_get_current_active_user():
     """Test getting the current active user."""
-    # Create a mock active user
-    active_user = User(username="active", disabled=False)
+    mock_user = MagicMock()
+    mock_user.email = "active@example.com"
 
-    # Test with active user
-    user = await get_current_active_user(active_user)
+    user = await get_current_active_user(mock_user)
     assert user is not None
-    assert user.username == "active"
-
-    # Test with inactive user
-    inactive_user = User(username="inactive", disabled=True)
-    with pytest.raises(HTTPException) as exc_info:
-        await get_current_active_user(inactive_user)
-
-    assert exc_info.value.status_code == 400
-    assert "Inactive user" in str(exc_info.value.detail)
+    assert user.email == "active@example.com"
 
 
-# Test IP blocking functions
 def test_is_ip_blocked():
     """Test checking if an IP is blocked."""
-    # Create a mock request
     request = MagicMock()
-    request.client.host = "192.168.1.1"
+    request.client.host = "192.168.1.100"
 
-    # Test with unblocked IP
-    with patch("utils.security.get_remote_address", return_value="192.168.1.1"):
+    with patch("utils.security.get_remote_address", return_value="192.168.1.100"):
         assert is_ip_blocked(request) is False
 
-    # Block the IP
-    block_ip("192.168.1.1")
+    block_ip("192.168.1.100")
 
-    # Test with blocked IP
-    with patch("utils.security.get_remote_address", return_value="192.168.1.1"):
+    with patch("utils.security.get_remote_address", return_value="192.168.1.100"):
         assert is_ip_blocked(request) is True
 
 
 def test_block_ip():
     """Test blocking an IP."""
-    # Block an IP
-    block_ip("192.168.1.2")
+    block_ip("192.168.1.200")
 
-    # Create a mock request
     request = MagicMock()
-    request.client.host = "192.168.1.2"
+    request.client.host = "192.168.1.200"
 
-    # Test that the IP is blocked
-    with patch("utils.security.get_remote_address", return_value="192.168.1.2"):
+    with patch("utils.security.get_remote_address", return_value="192.168.1.200"):
         assert is_ip_blocked(request) is True
 
 
 def test_setup_security():
     """Test setting up security for a FastAPI app."""
-    # Create a mock FastAPI app
     app = MagicMock(spec=FastAPI)
     app.state = MagicMock()
 
-    # Call setup_security
     setup_security(app)
 
-    # Verify that the limiter was set
     assert hasattr(app.state, "limiter")
-
-    # Verify that the middleware was added
     app.middleware.assert_called_once_with("http")
