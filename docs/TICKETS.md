@@ -10,7 +10,6 @@
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
-| WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | High |
 | WND-031 | Scope all commands to sender's own product list | High |
 | WND-032 | Add !me command to show user's Signal identity/stats | Medium |
 | **Phase 3: React Web Interface** | | |
@@ -32,6 +31,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | 2026-01-16 | #38 |
 | WND-029 | Auto-create User record for new Signal senders | 2026-01-16 | #37 |
 | WND-028 | Parse sender phone/username from signal-cli JSON output | 2026-01-16 | #36 |
 | WND-027 | Update tracker API to filter products by authenticated user | 2026-01-16 | #32 |

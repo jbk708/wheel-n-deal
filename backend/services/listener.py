@@ -16,88 +16,91 @@ logger = get_logger("listener")
 def parse_message(message: str):
     """
     Parse the incoming message and extract command, URL, and target price if present.
+
+    Commands must start with ! prefix. Messages without prefix are ignored.
     Supported commands:
-    - "track <url> <target_price>" (target_price is optional)
-    - "status"
-    - "help"
-    - "list" (List tracked items)
-    - "stop <number>" (Stop tracking item by number)
+    - "!track <url> [target_price]" (target_price is optional)
+    - "!status"
+    - "!help"
+    - "!list" (List tracked items)
+    - "!stop <number>" (Stop tracking item by number)
     """
-    logger.debug(f"Parsing message: {message}")
+    logger.debug("Parsing message: %s", message)
 
-    if "track" in message.lower():
-        # Extract URL and optional target price using regex
-        url_match = re.search(r"(https?://\S+)", message)
+    # Check for ! prefix - ignore messages without it
+    stripped = message.strip()
+    if not stripped.startswith("!"):
+        return {"command": "ignore"}
 
-        if url_match:
-            url = url_match.group(0)
-            # Look for target price AFTER the URL - must be a standalone number
-            # Only match price if explicitly provided (e.g., "track <url> 15.99")
-            after_url = message[url_match.end() :]
-            # Match a price that's clearly separate: whitespace + number (with optional decimals)
-            price_match = re.search(r"^\s+(\d+(?:\.\d{1,2})?)\s*$", after_url)
-            target_price = float(price_match.group(1)) if price_match else None
-            logger.info(f"Parsed track command: URL={url}, target_price={target_price}")
-            return {"command": "track", "url": url, "target_price": target_price}
-        else:
-            logger.warning("Invalid URL format in track command")
+    # Command must immediately follow ! (no space between ! and command)
+    # e.g., "!track url" is valid, "! track url" is not
+    command_text = stripped[1:]
+    if not command_text or command_text[0].isspace():
+        return {"command": "ignore"}
+
+    command_lower = command_text.lower()
+
+    if command_lower.startswith("track"):
+        url_match = re.search(r"(https?://\S+)", command_text)
+        if not url_match:
+            logger.warning("Invalid URL format in !track command")
             return {
                 "command": "invalid",
-                "message": "Invalid URL format. Use 'track <url> <target_price>'.",
+                "message": "Invalid URL format. Use '!track <url> [target_price]'.",
             }
 
-    elif "status" in message.lower():
-        logger.info("Parsed status command")
+        url = url_match.group(0)
+        after_url = command_text[url_match.end() :]
+        price_match = re.search(r"^\s+(\d+(?:\.\d{1,2})?)\s*$", after_url)
+        target_price = float(price_match.group(1)) if price_match else None
+        logger.info("Parsed !track command: URL=%s, target_price=%s", url, target_price)
+        return {"command": "track", "url": url, "target_price": target_price}
+
+    elif command_lower == "status":
+        logger.info("Parsed !status command")
         return {"command": "status"}
 
-    elif "help" in message.lower():
-        logger.info("Parsed help command")
+    elif command_lower == "help":
+        logger.info("Parsed !help command")
         return {"command": "help"}
 
-    elif "list" in message.lower():
-        logger.info("Parsed list command")
+    elif command_lower == "list":
+        logger.info("Parsed !list command")
         return {"command": "list"}
 
-    elif "stop" in message.lower():
+    elif command_lower.startswith("stop"):
         # Extract the number after "stop"
-        number_match = re.search(r"stop\s+(\d+)", message.lower())
+        number_match = re.search(r"^stop\s+(\d+)$", command_lower)
         if number_match:
-            try:
-                number = int(number_match.group(1))
-                logger.info(f"Parsed stop command: number={number}")
-                return {"command": "stop", "number": number}
-            except ValueError:
-                logger.warning("Invalid number format in stop command")
-                return {
-                    "command": "invalid",
-                    "message": "Invalid number format. Use 'stop <number>'.",
-                }
+            number = int(number_match.group(1))
+            logger.info("Parsed !stop command: number=%s", number)
+            return {"command": "stop", "number": number}
         else:
-            logger.warning("Invalid stop command format")
+            logger.warning("Invalid !stop command format")
             return {
                 "command": "invalid",
-                "message": "Invalid stop command. Use 'stop <number>'.",
+                "message": "Invalid !stop command. Use '!stop <number>'.",
             }
 
     else:
-        logger.warning(f"Unknown command: {message}")
+        logger.warning("Unknown command: %s", command_text)
         return {
             "command": "invalid",
-            "message": "Unknown command. Type 'help' for available commands.",
+            "message": "Unknown command. Type '!help' for available commands.",
         }
 
 
 def handle_help_message() -> str:
     """Generate a help message with available commands."""
     logger.debug("Generating help message")
-    return """
-Available commands:
-- track <url> [target_price] - Track a product URL with optional target price
-- status - Check if the bot is running
-- list - List all tracked products
-- stop <number> - Stop tracking a product by its number in the list
-- help - Show this help message
-    """
+    return (
+        "Available commands:\n"
+        "- !track <url> [target_price] - Track a product URL with optional target price\n"
+        "- !status - Check if the bot is running\n"
+        "- !list - List all tracked products\n"
+        "- !stop <number> - Stop tracking a product by its number in the list\n"
+        "- !help - Show this help message"
+    )
 
 
 def handle_list_tracked_items() -> str:
@@ -233,7 +236,11 @@ def listen_to_group() -> None:
             parsed_command = parse_message(message)
             cmd = parsed_command["command"]
 
-            if cmd == "track":
+            if cmd == "ignore":
+                # Message doesn't start with ! prefix, skip silently
+                pass
+
+            elif cmd == "track":
                 response = handle_track_command(
                     parsed_command["url"], parsed_command["target_price"]
                 )
@@ -248,7 +255,7 @@ def listen_to_group() -> None:
                 send_signal_message_to_group(group_id, handle_list_tracked_items())
 
             elif cmd == "stop":
-                logger.info(f"Stopping tracking for item {parsed_command['number']}")
+                logger.info("Stopping tracking for item %s", parsed_command["number"])
                 stop_message = stop_tracking_item(parsed_command["number"] - 1)
                 send_signal_message_to_group(group_id, stop_message)
 
@@ -256,8 +263,8 @@ def listen_to_group() -> None:
                 logger.info("Sending help message")
                 send_signal_message_to_group(group_id, handle_help_message())
 
-            else:
-                logger.warning(f"Invalid command: {parsed_command['message']}")
+            elif cmd == "invalid":
+                logger.warning("Invalid command: %s", parsed_command["message"])
                 send_signal_message_to_group(group_id, parsed_command["message"])
 
         except Exception as e:
