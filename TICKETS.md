@@ -1,0 +1,31 @@
+# Tickets
+
+## Active
+
+| Ticket | Description | Status | Branch |
+|--------|-------------|--------|--------|
+| | | | |
+
+## Backlog
+
+| Ticket | Description | Priority |
+|--------|-------------|----------|
+| WND-011 | Migrate from Poetry to uv for package/env management | High |
+| WND-012 | Configure ruff as sole linter/formatter (remove pylint) | High |
+| WND-013 | Add ty for type checking | High |
+| WND-001 | Set up Alembic migrations | High |
+| WND-002 | Wire security routes to API (auth, rate limiting) | High |
+| WND-003 | Fix CORS to restrict allowed origins | High |
+| WND-004 | Consolidate duplicate model definitions | Medium |
+| WND-005 | Fix deprecated SQLAlchemy import in models/database.py | Medium |
+| WND-006 | Replace print() with logger in price_check.py | Medium |
+| WND-007 | Standardize price type handling (string vs float) | Medium |
+| WND-008 | Re-enable and fix skipped integration tests | Medium |
+| WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
+| WND-010 | Add database connection pooling configuration | Low |
+
+## Completed
+
+| Ticket | Description | Completed | PR |
+|--------|-------------|-----------|-----|
+| | | | |
