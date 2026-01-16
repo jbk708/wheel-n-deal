@@ -1,5 +1,5 @@
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 src = ["backend"]
 
@@ -46,7 +46,7 @@ skip-magic-trailing-comma = false
 docstring-code-format = true
 
 [tool.ty.environment]
-python-version = "3.10"
+python-version = "3.12"
 python = "backend/.venv"
 
 [tool.ty.rules]
