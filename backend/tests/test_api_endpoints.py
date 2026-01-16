@@ -2,8 +2,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from routers.tracker import get_tracked_products, track_product
+
+
+@pytest.fixture
+def mock_request():
+    """Mock the Starlette request object for rate limiting."""
+    mock_req = MagicMock(spec=Request)
+    mock_req.client.host = "127.0.0.1"
+    mock_req.app = MagicMock()
+    mock_req.app.state.limiter = MagicMock()
+    mock_req.state = MagicMock()
+    return mock_req
 
 
 @pytest.fixture
@@ -50,7 +62,9 @@ def mock_signal():
 
 
 @pytest.mark.asyncio
-async def test_track_product_success(mock_scraper, mock_db_session, mock_celery_task, mock_signal):
+async def test_track_product_success(
+    mock_request, mock_scraper, mock_db_session, mock_celery_task, mock_signal
+):
     """Test the track_product function with valid data."""
     # Create a product to track
     from routers.tracker import Product
@@ -58,7 +72,7 @@ async def test_track_product_success(mock_scraper, mock_db_session, mock_celery_
     product = Product(url="https://example.com/product", target_price=90.0)
 
     # Call the function
-    response = await track_product(product, mock_db_session)
+    response = await track_product(mock_request, product, mock_db_session)
 
     # Verify the response
     assert response["title"] == "Test Product"
@@ -79,7 +93,7 @@ async def test_track_product_success(mock_scraper, mock_db_session, mock_celery_
 
 @pytest.mark.asyncio
 async def test_track_product_no_target_price(
-    mock_scraper, mock_db_session, mock_celery_task, mock_signal
+    mock_request, mock_scraper, mock_db_session, mock_celery_task, mock_signal
 ):
     """Test the track_product function without a target price."""
     # Create a product to track without a target price
@@ -88,7 +102,7 @@ async def test_track_product_no_target_price(
     product = Product(url="https://example.com/product")
 
     # Call the function
-    response = await track_product(product, mock_db_session)
+    response = await track_product(mock_request, product, mock_db_session)
 
     # Verify the response
     assert response["title"] == "Test Product"
@@ -129,7 +143,7 @@ def mock_db_session_with_existing_product():
 
 @pytest.mark.asyncio
 async def test_track_product_existing(
-    mock_scraper, mock_db_session_with_existing_product, mock_celery_task, mock_signal
+    mock_request, mock_scraper, mock_db_session_with_existing_product, mock_celery_task, mock_signal
 ):
     """Test the track_product function with an existing product."""
     # Create a product to track
@@ -139,7 +153,7 @@ async def test_track_product_existing(
 
     # Call the function and expect an exception
     with pytest.raises(HTTPException) as exc_info:
-        await track_product(product, mock_db_session_with_existing_product)
+        await track_product(mock_request, product, mock_db_session_with_existing_product)
 
     # Verify the exception
     assert exc_info.value.status_code == 400
@@ -157,7 +171,7 @@ async def test_track_product_existing(
 
 
 @pytest.mark.asyncio
-async def test_track_product_scraper_error(mock_db_session):
+async def test_track_product_scraper_error(mock_request, mock_db_session):
     """Test the track_product function with a scraper error."""
     # Mock the scraper to raise an exception
     with patch("routers.tracker.scrape_product_info", side_effect=Exception("Scraping failed")):
@@ -168,7 +182,7 @@ async def test_track_product_scraper_error(mock_db_session):
 
         # Call the function and expect an exception
         with pytest.raises(HTTPException) as exc_info:
-            await track_product(product, mock_db_session)
+            await track_product(mock_request, product, mock_db_session)
 
         # Verify the exception
         assert exc_info.value.status_code == 500
@@ -226,10 +240,10 @@ def mock_db_session_for_products():
 
 
 @pytest.mark.asyncio
-async def test_get_products_success(mock_db_session_for_products):
+async def test_get_products_success(mock_request, mock_db_session_for_products):
     """Test the get_products function."""
     # Call the function
-    response = await get_tracked_products(mock_db_session_for_products)
+    response = await get_tracked_products(mock_request, mock_db_session_for_products)
 
     # Verify the response
     assert len(response) == 2
@@ -242,7 +256,7 @@ async def test_get_products_success(mock_db_session_for_products):
 
 
 @pytest.mark.asyncio
-async def test_get_products_error():
+async def test_get_products_error(mock_request):
     """Test the get_products function with a database error."""
     # Mock the database session
     with patch("routers.tracker.get_db_session") as mock_get_db_session:
@@ -255,7 +269,7 @@ async def test_get_products_error():
 
         # Call the function and expect an exception
         with pytest.raises(HTTPException) as exc_info:
-            await get_tracked_products(mock_session)
+            await get_tracked_products(mock_request, mock_session)
 
         # Verify the exception
         assert exc_info.value.status_code == 500

@@ -122,6 +122,7 @@ From the project root:
 
 ### Routers (`backend/routers/`)
 
+- **auth.py**: Authentication endpoints - login, token refresh (mounted at `/api/v1/auth`)
 - **tracker.py**: API endpoints for product tracking (mounted at `/api/v1/tracker`)
 
 ### Utils (`backend/utils/`)
@@ -134,16 +135,18 @@ From the project root:
 
 ### Working Features
 - REST API for product tracking (CRUD operations)
+- JWT authentication with OAuth2 password flow
+- Rate limiting on all API endpoints
 - Web scraping for Amazon, Walmart, Best Buy, Target, eBay + generic sites
 - Signal integration (listener and notifications)
 - Celery background tasks for price checking
 - Prometheus metrics and Loguru logging
 - Docker deployment with all services
+- Database migrations with Alembic
 
 ### Known Issues
 
 **High Priority**:
-- Security endpoints defined in `utils/security.py` but not wired to routes
 - CORS allows all origins (`["*"]`) in `main.py:63`
 
 **Medium Priority**:
@@ -163,7 +166,6 @@ From the project root:
 | Issue | Location | Fix |
 |-------|----------|-----|
 | Consolidate models | `models.py`, `models/database.py` | Keep one, delete duplicate |
-| Wire security routes | `main.py`, `security.py` | Register auth router, apply rate limiting |
 | Fix deprecated import | `models/database.py:13` | Change to `from sqlalchemy.orm import declarative_base` |
 | Replace print with logger | `tasks/price_check.py` | Use `get_logger()` |
 | Re-enable integration tests | `tests/integration/` | Debug and fix skipped tests |

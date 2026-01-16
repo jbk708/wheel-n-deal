@@ -10,7 +10,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-002 | Wire security routes to API (auth, rate limiting) | High |
 | WND-003 | Fix CORS to restrict allowed origins | High |
 | WND-004 | Consolidate duplicate model definitions | Medium |
 | WND-005 | Fix deprecated SQLAlchemy import in models/database.py | Medium |
@@ -27,6 +26,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-002 | Wire security routes to API (auth, rate limiting) | 2026-01-16 | #8 |
 | WND-001 | Set up Alembic migrations | 2026-01-16 | #7 |
 | WND-013 | Add ty for type checking | 2026-01-16 | #6 |
 | WND-012 | Configure ruff as sole linter/formatter (remove pylint) | 2026-01-16 | #5 |
