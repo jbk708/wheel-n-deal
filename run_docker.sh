@@ -1,28 +1,28 @@
 #!/bin/bash
 
-# Function to start the docker-compose services
+# Function to start the docker compose services
 start_services() {
   echo "Starting Docker Compose services..."
-  docker-compose up --build -d
+  docker compose up --build -d
 }
 
-# Function to stop the docker-compose services
+# Function to stop the docker compose services
 stop_services() {
   echo "Stopping Docker Compose services..."
-  docker-compose down
+  docker compose down
 }
 
-# Function to restart the docker-compose services
+# Function to restart the docker compose services
 restart_services() {
   echo "Restarting Docker Compose services..."
-  docker-compose down
-  docker-compose up --build -d
+  docker compose down
+  docker compose up --build -d
 }
 
 # Function to view logs
 view_logs() {
   echo "Displaying Docker logs..."
-  docker-compose logs -f
+  docker compose logs -f
 }
 
 # Function to display usage instructions
