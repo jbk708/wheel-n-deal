@@ -9,7 +9,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-017 | Consolidate duplicate test files (test_tracker.py, test_api_endpoints.py) | Low |
 | WND-018 | Extract helper functions in tracker.py to reduce duplication | Low |
 | WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
 | WND-020 | Update setup instructions | Low |
@@ -19,6 +18,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-017 | Consolidate duplicate test files | 2026-01-16 | #19 |
 | WND-016 | Migrate to Python 3.12+ | 2026-01-16 | #18 |
 | WND-010 | Add database connection pooling configuration | 2026-01-16 | #17 |
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | 2026-01-16 | #16 |
