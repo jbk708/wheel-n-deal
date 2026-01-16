@@ -7,7 +7,8 @@ from tasks.price_check import check_price
 # Mock product info data
 mock_product_info = {
     "title": "Test Product",
-    "price": "$80",
+    "price": "$80.00",
+    "price_float": 80.0,
     "url": "https://example.com/product",
 }
 
@@ -60,7 +61,7 @@ def test_check_price_success(
 
     # Verify that send_signal_message was called since the price is lower than target_price
     mock_send_signal.assert_called_once_with(
-        f"Price drop alert! Test Product is now $80.\nTarget price was 90.0.\nURL: {valid_url}"
+        f"Price drop alert! Test Product is now $80.00.\nTarget price was 90.0.\nURL: {valid_url}"
     )
 
     # Verify that apply_async is called to reschedule the task

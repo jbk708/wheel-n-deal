@@ -21,7 +21,10 @@ def check_price(url: str, target_price: float) -> None:
     """
     try:
         product_info = scrape_product_info(url)
-        current_price = float(product_info["price"].replace("$", "").replace(",", ""))
+        current_price = product_info.get("price_float")
+        if current_price is None:
+            logger.warning(f"Could not parse price for {url}")
+            return
 
         db = get_db_session()
         try:
