@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI, HTTPException
 from jose import jwt
+
 from utils.security import (
     ALGORITHM,
     SECRET_KEY,

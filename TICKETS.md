@@ -10,7 +10,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-012 | Configure ruff as sole linter/formatter (remove pylint) | High |
 | WND-013 | Add ty for type checking | High |
 | WND-001 | Set up Alembic migrations | High |
 | WND-002 | Wire security routes to API (auth, rate limiting) | High |
@@ -27,4 +26,5 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-012 | Configure ruff as sole linter/formatter (remove pylint) | 2026-01-16 | #5 |
 | WND-011 | Migrate from Poetry to uv for package/env management | 2026-01-16 | #2 |

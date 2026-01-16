@@ -46,7 +46,7 @@ def send_signal_message(message: str):
     except Exception as e:
         # Only log and increment metrics if it's not our own exception
         if not str(e).startswith("Signal message failed:"):
-            logger.error(f"Error sending Signal message: {str(e)}")
+            logger.error(f"Error sending Signal message: {e!s}")
             SIGNAL_MESSAGES_FAILED.labels(type="group", error_type=type(e).__name__).inc()
         raise
 
@@ -87,6 +87,6 @@ def send_signal_message_to_group(group_id: str, message: str):
     except Exception as e:
         # Only log and increment metrics if it's not our own exception
         if not str(e).startswith("Failed to send Signal message to specific group:"):
-            logger.error(f"Error sending Signal message to specific group: {str(e)}")
+            logger.error(f"Error sending Signal message to specific group: {e!s}")
             SIGNAL_MESSAGES_FAILED.labels(type="specific_group", error_type=type(e).__name__).inc()
         raise
