@@ -42,10 +42,10 @@ async def lifespan(app: FastAPI):
     # Start Prometheus metrics server
     logger.info("Starting Prometheus metrics server...")
     app_metrics = make_wsgi_app()
-    httpd = make_server("", 8001, app_metrics)
+    httpd = make_server("", settings.METRICS_PORT, app_metrics)
     metrics_server = threading.Thread(target=httpd.serve_forever, daemon=True)
     metrics_server.start()
-    logger.info("Prometheus metrics server started successfully on port 8001")
+    logger.info(f"Prometheus metrics server started successfully on port {settings.METRICS_PORT}")
 
     yield
 
@@ -110,7 +110,7 @@ async def metrics():
     Endpoint to redirect to the Prometheus metrics server.
     """
     logger.info("Metrics endpoint accessed")
-    return {"message": "Metrics available at http://localhost:8001"}
+    return {"message": f"Metrics available at http://localhost:{settings.METRICS_PORT}"}
 
 
 if __name__ == "__main__":
