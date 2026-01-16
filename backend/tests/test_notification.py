@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from dotenv import load_dotenv
+
 from services.notification import send_signal_message, send_signal_message_to_group
 
 # Load environment variables from .env file
@@ -51,7 +52,7 @@ def test_send_signal_message_success(mock_settings, mock_run, mock_prometheus_me
 
     # Verify that subprocess.run was called with the correct arguments
     mock_run.assert_called_once()
-    args, kwargs = mock_run.call_args
+    args, _ = mock_run.call_args
     command = args[0]
 
     assert command[0] == "signal-cli"
@@ -150,7 +151,7 @@ def test_send_signal_message_to_group_success(mock_settings, mock_run, mock_prom
 
     # Verify that subprocess.run was called with the correct arguments
     mock_run.assert_called_once()
-    args, kwargs = mock_run.call_args
+    args, _ = mock_run.call_args
     command = args[0]
 
     assert command[0] == "signal-cli"

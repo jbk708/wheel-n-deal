@@ -1,7 +1,8 @@
 import pytest
-from models import Base, PriceHistory, Product
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from models import Base, PriceHistory, Product
 
 
 @pytest.fixture

@@ -2,16 +2,16 @@ import re
 import subprocess
 import time
 
-from config import settings
 from fastapi import HTTPException
+from pydantic import BaseModel
+
+from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
-from pydantic import BaseModel
 from routers.tracker import track_product
+from services.notification import send_signal_message_to_group
 from utils.logging import get_logger
 from utils.monitoring import TRACKED_PRODUCTS
-
-from services.notification import send_signal_message_to_group
 
 # Setup logger
 logger = get_logger("listener")
@@ -145,8 +145,8 @@ def handle_list_tracked_items():
         logger.debug(f"Generated list of {len(products)} tracked products")
         return message
     except Exception as e:
-        logger.error(f"Error retrieving tracked products: {str(e)}", exc_info=True)
-        return f"Error retrieving tracked products: {str(e)}"
+        logger.error(f"Error retrieving tracked products: {e!s}", exc_info=True)
+        return f"Error retrieving tracked products: {e!s}"
     finally:
         db.close()
 
@@ -181,8 +181,8 @@ def stop_tracking_item(index: int):
             return f"Invalid number. Please provide a number between 1 and {len(products)}."
     except Exception as e:
         db.rollback()
-        logger.error(f"Error stopping tracking: {str(e)}", exc_info=True)
-        return f"Error stopping tracking: {str(e)}"
+        logger.error(f"Error stopping tracking: {e!s}", exc_info=True)
+        return f"Error stopping tracking: {e!s}"
     finally:
         db.close()
 
@@ -228,9 +228,9 @@ def listen_to_group():
                                 f"Product is now being tracked: {product.url}. Target price: {product.target_price}",
                             )
                         except HTTPException as e:
-                            logger.error(f"Failed to track product: {str(e.detail)}")
+                            logger.error(f"Failed to track product: {e.detail!s}")
                             send_signal_message_to_group(
-                                group_id, f"Failed to track product: {str(e.detail)}"
+                                group_id, f"Failed to track product: {e.detail!s}"
                             )
 
                     elif parsed_command["command"] == "status":
@@ -267,7 +267,7 @@ def listen_to_group():
                 error_message = result.stderr.decode("utf-8")
                 logger.error(f"Failed to receive messages: {error_message}")
         except Exception as e:
-            logger.error(f"Error while listening to Signal group: {str(e)}", exc_info=True)
+            logger.error(f"Error while listening to Signal group: {e!s}", exc_info=True)
 
         logger.debug("Sleeping for 5 seconds before checking for new messages...")
         time.sleep(5)

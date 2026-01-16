@@ -1,18 +1,24 @@
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+src = ["backend"]
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-    "N",  # pep8-naming
-    "SIM", # flake8-simplify
-    "TCH", # flake8-type-checking
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "S",    # flake8-bandit (security)
+    "A",    # flake8-builtins
+    "RUF",  # ruff-specific rules
+    "PERF", # perflint
 ]
 ignore = [
     "E501",  # line too long, handled by formatter
@@ -20,7 +26,14 @@ ignore = [
     "UP007", # Use `X | Y` instead of `Union[X, Y]`
     "UP035", # `typing.List` is deprecated, use `list` instead
     "UP045", # Use `X | None` instead of `Optional[X]`
+    "S104",  # binding to all interfaces - intentional for Docker/server
+    "S311",  # pseudo-random for scheduling jitter, not crypto
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["S101", "S105"]  # Allow assert and test passwords in tests
+"**/services/listener.py" = ["S603"]  # subprocess for signal-cli
+"**/services/notification.py" = ["S603"]  # subprocess for signal-cli
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend"]

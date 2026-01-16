@@ -6,8 +6,9 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from models import init_db
 from prometheus_client import make_wsgi_app
+
+from models import init_db
 from routers.tracker import router as tracker_router
 from services.listener import listen_to_group
 from utils.logging import get_logger
@@ -79,7 +80,7 @@ app.include_router(tracker_router, prefix="/api/v1/tracker", tags=["tracker"])
 # Exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    logger.error(f"Unhandled exception: {exc!s}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "An unexpected error occurred. Please try again later."},

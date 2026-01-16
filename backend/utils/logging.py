@@ -1,8 +1,9 @@
 import os
 import sys
 
-from config import settings
 from loguru import logger
+
+from config import settings
 
 # Remove default logger
 logger.remove()

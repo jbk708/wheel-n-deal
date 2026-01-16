@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from config import settings
 from sqlalchemy import (
     Column,
     DateTime,
@@ -12,6 +11,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+from config import settings
 from utils.logging import get_logger
 from utils.monitoring import DATABASE_CONNECTIONS, DATABASE_ERRORS
 
@@ -27,7 +28,7 @@ try:
     # Increment the database connections metric
     DATABASE_CONNECTIONS.inc()
 except Exception as e:
-    logger.error(f"Failed to create database engine: {str(e)}", exc_info=True)
+    logger.error(f"Failed to create database engine: {e!s}", exc_info=True)
     # Increment the database errors metric
     DATABASE_ERRORS.inc()
     raise
@@ -49,7 +50,7 @@ def get_db_session():
         return db
     except Exception as e:
         db.close()
-        logger.error(f"Error creating database session: {str(e)}", exc_info=True)
+        logger.error(f"Error creating database session: {e!s}", exc_info=True)
         # Increment the database errors metric
         DATABASE_ERRORS.inc()
         raise
@@ -64,7 +65,7 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize database: {str(e)}", exc_info=True)
+        logger.error(f"Failed to initialize database: {e!s}", exc_info=True)
         # Increment the database errors metric
         DATABASE_ERRORS.inc()
         raise

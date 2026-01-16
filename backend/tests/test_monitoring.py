@@ -2,6 +2,7 @@ import time
 from unittest.mock import AsyncMock
 
 import pytest
+
 from utils.monitoring import (
     DATABASE_CONNECTIONS,
     HTTP_REQUESTS_TOTAL,
