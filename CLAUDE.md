@@ -24,7 +24,8 @@ Follow this workflow for all ticket development:
    uv run ty check             # Type check
    uv run pytest               # Run tests
    ```
-7. **Update Ticket**: Mark ticket complete in `TICKETS.md`
+7. **Simplify**: Run code simplifier to clean up implementation
+8. **Update Ticket**: Mark ticket complete in `TICKETS.md`
 
 ### Conventions
 
@@ -154,8 +155,6 @@ From the project root:
 ### Known Issues
 
 **Medium Priority**:
-- Duplicate model definitions in `models.py` and `models/database.py`
-- Deprecated import in `models/database.py:13`: uses `sqlalchemy.ext.declarative` instead of `sqlalchemy.orm`
 - `tasks/price_check.py` uses `print()` instead of logger
 - Price type inconsistency: sometimes string (`"$80"`), sometimes float
 - Integration tests in `tests/integration/` are skipped
@@ -169,8 +168,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Consolidate models | `models.py`, `models/database.py` | Keep one, delete duplicate |
-| Fix deprecated import | `models/database.py:13` | Change to `from sqlalchemy.orm import declarative_base` |
 | Replace print with logger | `tasks/price_check.py` | Use `get_logger()` |
 | Re-enable integration tests | `tests/integration/` | Debug and fix skipped tests |
 
