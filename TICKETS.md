@@ -10,7 +10,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-013 | Add ty for type checking | High |
 | WND-001 | Set up Alembic migrations | High |
 | WND-002 | Wire security routes to API (auth, rate limiting) | High |
 | WND-003 | Fix CORS to restrict allowed origins | High |
@@ -21,10 +20,13 @@
 | WND-008 | Re-enable and fix skipped integration tests | Medium |
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
 | WND-010 | Add database connection pooling configuration | Low |
+| WND-014 | Fix type errors reported by ty (4 errors) | Medium |
+| WND-015 | Replace deprecated datetime.utcnow() with timezone-aware | Low |
 
 ## Completed
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-013 | Add ty for type checking | 2026-01-16 | #6 |
 | WND-012 | Configure ruff as sole linter/formatter (remove pylint) | 2026-01-16 | #5 |
 | WND-011 | Migrate from Poetry to uv for package/env management | 2026-01-16 | #2 |
