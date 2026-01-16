@@ -53,9 +53,20 @@ class PriceHistory(Base):
 
 
 def get_db_engine(db_url: str | None = None):
-    """Create a database engine."""
+    """Create a database engine with connection pooling for non-SQLite databases."""
     url = db_url or settings.DATABASE_URL
-    return create_engine(url)
+
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+
+    return create_engine(
+        url,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_timeout=settings.DB_POOL_TIMEOUT,
+        pool_recycle=settings.DB_POOL_RECYCLE,
+        pool_pre_ping=settings.DB_POOL_PRE_PING,
+    )
 
 
 def get_db_session(engine=None):
