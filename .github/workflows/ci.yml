@@ -60,7 +60,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'dev')
 
     steps:
     - uses: actions/checkout@v4

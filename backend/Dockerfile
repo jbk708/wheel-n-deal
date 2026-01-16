@@ -14,7 +14,7 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y google-chrome-stable \
     chromium-driver \
-    openjdk-17-jre \
+    default-jre-headless \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -31,7 +31,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 WORKDIR /app
 
 # Copy project files
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Install dependencies (production only)
 RUN uv sync --frozen --no-dev
