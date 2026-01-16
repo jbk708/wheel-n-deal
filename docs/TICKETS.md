@@ -4,13 +4,13 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-028 | Parse sender phone/username from signal-cli JSON output | In Review | feat-WND-028-parse-signal-sender |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
-| WND-028 | Parse sender phone/username from signal-cli JSON output | High |
 | WND-029 | Auto-create User record for new Signal senders | High |
 | WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | High |
 | WND-031 | Scope all commands to sender's own product list | High |
