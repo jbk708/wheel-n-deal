@@ -1,12 +1,14 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from tasks.price_check import check_price
 
 # Mock product info data
 mock_product_info = {
     "title": "Test Product",
-    "price": "$80",
+    "price": "$80.00",
+    "price_float": 80.0,
     "url": "https://example.com/product",
 }
 
@@ -59,15 +61,15 @@ def test_check_price_success(
 
     # Verify that send_signal_message was called since the price is lower than target_price
     mock_send_signal.assert_called_once_with(
-        f"Price drop alert! Test Product is now $80.\nTarget price was 90.0.\nURL: {valid_url}"
+        f"Price drop alert! Test Product is now $80.00.\nTarget price was 90.0.\nURL: {valid_url}"
     )
 
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     countdown = mock_apply_async.call_args[1]["countdown"]
-    assert (
-        3600 - 600 <= countdown <= 3600 + 600
-    ), f"Countdown {countdown} is not within expected range"
+    assert 3600 - 600 <= countdown <= 3600 + 600, (
+        f"Countdown {countdown} is not within expected range"
+    )
 
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
@@ -110,9 +112,9 @@ def test_check_price_no_drop(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     countdown = mock_apply_async.call_args[1]["countdown"]
-    assert (
-        3600 - 600 <= countdown <= 3600 + 600
-    ), f"Countdown {countdown} is not within expected range"
+    assert 3600 - 600 <= countdown <= 3600 + 600, (
+        f"Countdown {countdown} is not within expected range"
+    )
 
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
@@ -153,9 +155,9 @@ def test_check_price_product_not_found(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     countdown = mock_apply_async.call_args[1]["countdown"]
-    assert (
-        3600 - 600 <= countdown <= 3600 + 600
-    ), f"Countdown {countdown} is not within expected range"
+    assert 3600 - 600 <= countdown <= 3600 + 600, (
+        f"Countdown {countdown} is not within expected range"
+    )
 
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
@@ -200,9 +202,9 @@ def test_check_price_database_error(
     # Verify that apply_async is called to reschedule the task
     assert mock_apply_async.called
     countdown = mock_apply_async.call_args[1]["countdown"]
-    assert (
-        3600 - 600 <= countdown <= 3600 + 600
-    ), f"Countdown {countdown} is not within expected range"
+    assert 3600 - 600 <= countdown <= 3600 + 600, (
+        f"Countdown {countdown} is not within expected range"
+    )
 
     # Verify that the database session was closed
     mock_session.close.assert_called_once()
@@ -235,6 +237,6 @@ def test_check_price_scraping_failure(
     # Verify that apply_async is still called to reschedule the task
     assert mock_apply_async.called
     countdown = mock_apply_async.call_args[1]["countdown"]
-    assert (
-        3600 - 600 <= countdown <= 3600 + 600
-    ), f"Countdown {countdown} is not within expected range"
+    assert 3600 - 600 <= countdown <= 3600 + 600, (
+        f"Countdown {countdown} is not within expected range"
+    )

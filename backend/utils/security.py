@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from config import settings
 from utils.logging import get_logger
 
 # Setup logger
@@ -17,13 +18,13 @@ logger = get_logger("security")
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings
-SECRET_KEY = "CHANGE_THIS_TO_A_SECURE_SECRET_KEY"  # Should be loaded from environment variables
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# JWT settings from config
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# OAuth2 scheme - tokenUrl matches the auth router endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -91,9 +92,9 @@ def authenticate_user(fake_db, username: str, password: str):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -110,10 +111,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception from None
-    user = get_user(fake_users_db, username=token_data.username)
+    user = get_user(fake_users_db, username=username)
     if user is None:
         raise credentials_exception
     return user
@@ -127,21 +127,6 @@ async def get_current_active_user(current_user: User = current_user_dependency):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
-
-
-# Rate limiting decorator
-def rate_limit(limit: str, key_func=get_remote_address):
-    """
-    Rate limiting decorator for FastAPI endpoints.
-
-    Args:
-        limit (str): The rate limit string (e.g., "5/minute", "100/hour").
-        key_func (callable): Function to extract the key from the request.
-
-    Returns:
-        callable: The decorated function.
-    """
-    return limiter.limit(limit, key_func=key_func)
 
 
 # IP blocking

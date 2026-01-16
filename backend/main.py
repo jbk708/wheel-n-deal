@@ -6,8 +6,13 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from models import init_db
 from prometheus_client import make_wsgi_app
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from config import settings
+from models import init_db
+from routers.auth import router as auth_router
 from routers.tracker import router as tracker_router
 from services.listener import listen_to_group
 from utils.logging import get_logger
@@ -37,10 +42,10 @@ async def lifespan(app: FastAPI):
     # Start Prometheus metrics server
     logger.info("Starting Prometheus metrics server...")
     app_metrics = make_wsgi_app()
-    httpd = make_server("", 8001, app_metrics)
+    httpd = make_server("", settings.METRICS_PORT, app_metrics)
     metrics_server = threading.Thread(target=httpd.serve_forever, daemon=True)
     metrics_server.start()
-    logger.info("Prometheus metrics server started successfully on port 8001")
+    logger.info(f"Prometheus metrics server started successfully on port {settings.METRICS_PORT}")
 
     yield
 
@@ -60,26 +65,30 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
 # Add Prometheus middleware
 app.add_middleware(PrometheusMiddleware)
 
-# Setup security
+# Setup security (rate limiter, IP blocking)
 setup_security(app)
 
+# Add rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Include routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(tracker_router, prefix="/api/v1/tracker", tags=["tracker"])
 
 
 # Exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    logger.error(f"Unhandled exception: {exc!s}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "An unexpected error occurred. Please try again later."},
@@ -101,7 +110,7 @@ async def metrics():
     Endpoint to redirect to the Prometheus metrics server.
     """
     logger.info("Metrics endpoint accessed")
-    return {"message": "Metrics available at http://localhost:8001"}
+    return {"message": f"Metrics available at http://localhost:{settings.METRICS_PORT}"}
 
 
 if __name__ == "__main__":

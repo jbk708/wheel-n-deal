@@ -9,8 +9,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
+
 from utils.logging import get_logger
 from utils.monitoring import ScraperMetrics
+from utils.pricing import format_price, parse_price
 
 # Setup logger
 logger = get_logger("scraper")
@@ -292,15 +294,9 @@ def scrape_product_info(url: str):
             # Add the URL to the product information
             product_info["url"] = url
 
-            # Clean up the price format
-            if product_info["price"] != "Price not found":
-                # Extract the first price found in the string
-                price_match = re.search(r"[$€£¥]?(\d+(?:,\d+)*(?:\.\d+)?)", product_info["price"])
-                if price_match:
-                    product_info["price"] = f"${price_match.group(1)}"
-                else:
-                    logger.warning(f"Could not parse price format: {product_info['price']}")
-                    product_info["price"] = "Price not found"
+            # Parse price to float and create consistent display string
+            product_info["price_float"] = parse_price(product_info["price"])
+            product_info["price"] = format_price(product_info["price_float"])
 
             logger.info(
                 f"Successfully scraped product: {product_info['title']} at {product_info['price']}"
@@ -309,10 +305,20 @@ def scrape_product_info(url: str):
 
         except TimeoutException:
             logger.error(f"Timeout while scraping {url}")
-            return {"title": "Error: Page load timeout", "price": "Price not found", "url": url}
+            return {
+                "title": "Error: Page load timeout",
+                "price": "Price not found",
+                "price_float": None,
+                "url": url,
+            }
         except Exception as e:
-            logger.error(f"Error scraping {url}: {str(e)}", exc_info=True)
-            return {"title": f"Error: {str(e)}", "price": "Price not found", "url": url}
+            logger.error(f"Error scraping {url}: {e!s}", exc_info=True)
+            return {
+                "title": f"Error: {e!s}",
+                "price": "Price not found",
+                "price_float": None,
+                "url": url,
+            }
         finally:
             # Close the browser
             logger.debug("Closing browser")
