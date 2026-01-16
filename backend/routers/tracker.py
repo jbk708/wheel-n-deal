@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -8,19 +8,19 @@ from sqlalchemy.orm import Session
 from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
+from models import User as DBUser
 from services.notification import send_signal_message_to_group
 from services.scraper import scrape_product_info
 from utils.logging import get_logger
 from utils.monitoring import PRICE_ALERTS_SENT, TRACKED_PRODUCTS
-from utils.security import limiter
+from utils.security import get_current_active_user, limiter
 
-# Setup logger
 logger = get_logger("tracker")
 
 router = APIRouter()
 
-# Create a module-level singleton for the database session dependency
-db_dependency = Depends(get_db_session)
+_db_dependency = Depends(get_db_session)
+_current_user_dependency = Depends(get_current_active_user)
 
 
 class Product(BaseModel):
@@ -66,23 +66,35 @@ def build_product_response(product: DBProduct, current_price: float | None) -> d
     }
 
 
+def get_user_product(db: Session, user_id: int, product_id: int) -> DBProduct | None:
+    """Get a product by ID that belongs to a specific user."""
+    return (
+        db.query(DBProduct).filter(DBProduct.id == product_id, DBProduct.user_id == user_id).first()
+    )
+
+
 @router.post("/track", response_model=ProductResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def track_product(request: Request, product: Product, db: Session = db_dependency):
-    """
-    Track a product by URL with an optional target price.
-    If target_price is not provided, it will be set to 90% of the current price.
-    """
-    logger.info(f"Tracking product: {product.url}")
+async def track_product(
+    request: Request,
+    product: Product,
+    current_user: DBUser = _current_user_dependency,
+    db: Session = _db_dependency,
+):
+    """Track a product by URL with an optional target price for the authenticated user."""
+    logger.info(f"User {current_user.id} tracking product: {product.url}")
 
-    # Check if product is already being tracked
-    existing_product = db.query(DBProduct).filter(DBProduct.url == product.url).first()
+    existing_product = (
+        db.query(DBProduct)
+        .filter(DBProduct.user_id == current_user.id)
+        .filter(DBProduct.url == product.url)
+        .first()
+    )
     if existing_product:
-        logger.warning(f"Product already being tracked: {product.url}")
-        raise HTTPException(status_code=400, detail="Product is already being tracked")
+        logger.warning(f"User {current_user.id} already tracking product: {product.url}")
+        raise HTTPException(status_code=400, detail="You are already tracking this product")
 
     try:
-        # Scrape product info
         logger.debug(f"Scraping product info for: {product.url}")
         product_info = scrape_product_info(product.url)
 
@@ -90,14 +102,13 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
             logger.error(f"Failed to scrape product info: {product.url}")
             raise HTTPException(status_code=400, detail="Failed to scrape product information")
 
-        # Set target price if not provided
         current_price = product_info.get("price_float")
         if not product.target_price and current_price:
-            product.target_price = round(current_price * 0.9, 2)  # 10% discount
+            product.target_price = round(current_price * 0.9, 2)
             logger.info(f"Target price set to {product.target_price} (10% off current price)")
 
-        # Create new product
         db_product = DBProduct(
+            user_id=current_user.id,
             url=product.url,
             title=product_info["title"],
             description=product_info.get("description", ""),
@@ -109,7 +120,6 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
         db.commit()
         db.refresh(db_product)
 
-        # Add price history entry
         price_history = PriceHistory(
             product_id=db_product.id,
             price=current_price,
@@ -118,15 +128,12 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
         db.add(price_history)
         db.commit()
 
-        # Update tracked products metric
         TRACKED_PRODUCTS.inc()
 
-        # Schedule price check task
         from tasks.price_check import check_price
 
         check_price.apply_async(args=[product.url, product.target_price])
 
-        # Send notification
         message = f"Product is now being tracked: {product_info['title']} at {product_info['price']}. Target price is ${product.target_price}."
         send_signal_message_to_group(settings.SIGNAL_GROUP_ID, message)
 
@@ -134,29 +141,33 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
 
         return build_product_response(db_product, current_price)
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error tracking product: {e!s}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error tracking product: {e!s}") from e
 
 
-@router.get("/products", response_model=List[ProductResponse])
+@router.get("/products", response_model=list[ProductResponse])
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def get_tracked_products(request: Request, db: Session = db_dependency):
-    """
-    Get all tracked products with their current prices.
-    """
-    logger.info("Getting all tracked products")
+async def get_tracked_products(
+    request: Request,
+    current_user: DBUser = _current_user_dependency,
+    db: Session = _db_dependency,
+):
+    """Get all tracked products for the authenticated user."""
+    logger.info(f"Getting tracked products for user {current_user.id}")
 
     try:
-        products = db.query(DBProduct).all()
+        products = db.query(DBProduct).filter(DBProduct.user_id == current_user.id).all()
 
         response = [
-            build_product_response(product, get_latest_price(db, product.id))  # type: ignore[arg-type]
+            build_product_response(product, get_latest_price(db, product.id))
             for product in products
         ]
 
-        logger.debug(f"Retrieved {len(response)} tracked products")
+        logger.debug(f"Retrieved {len(response)} tracked products for user {current_user.id}")
         return response
 
     except Exception as e:
@@ -168,19 +179,23 @@ async def get_tracked_products(request: Request, db: Session = db_dependency):
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def get_product(request: Request, product_id: int, db: Session = db_dependency):
-    """
-    Get a specific tracked product by ID.
-    """
-    logger.info(f"Getting product with ID: {product_id}")
+async def get_product(
+    request: Request,
+    product_id: int,
+    current_user: DBUser = _current_user_dependency,
+    db: Session = _db_dependency,
+):
+    """Get a specific tracked product by ID for the authenticated user."""
+    user_id = cast("int", current_user.id)
+    logger.info(f"User {user_id} getting product with ID: {product_id}")
 
     try:
-        product = db.query(DBProduct).filter(DBProduct.id == product_id).first()
+        product = get_user_product(db, user_id, product_id)
         if not product:
-            logger.warning(f"Product not found: ID {product_id}")
+            logger.warning(f"Product not found: ID {product_id} for user {user_id}")
             raise HTTPException(status_code=404, detail="Product not found")
 
-        current_price = get_latest_price(db, product.id)
+        current_price = get_latest_price(db, cast("int", product.id))
 
         logger.debug(f"Retrieved product: {product.title} (ID: {product.id})")
         return build_product_response(product, current_price)
@@ -194,22 +209,25 @@ async def get_product(request: Request, product_id: int, db: Session = db_depend
 
 @router.delete("/products/{product_id}")
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def delete_product(request: Request, product_id: int, db: Session = db_dependency):
-    """
-    Delete a tracked product by ID.
-    """
-    logger.info(f"Deleting product with ID: {product_id}")
+async def delete_product(
+    request: Request,
+    product_id: int,
+    current_user: DBUser = _current_user_dependency,
+    db: Session = _db_dependency,
+):
+    """Delete a tracked product by ID for the authenticated user."""
+    user_id = cast("int", current_user.id)
+    logger.info(f"User {user_id} deleting product with ID: {product_id}")
 
     try:
-        product = db.query(DBProduct).filter(DBProduct.id == product_id).first()
+        product = get_user_product(db, user_id, product_id)
         if not product:
-            logger.warning(f"Product not found for deletion: ID {product_id}")
+            logger.warning(f"Product not found for deletion: ID {product_id} for user {user_id}")
             raise HTTPException(status_code=404, detail="Product not found")
 
         db.delete(product)
         db.commit()
 
-        # Update tracked products metric
         TRACKED_PRODUCTS.dec()
 
         logger.info(f"Product deleted: {product.title} (ID: {product.id})")
@@ -224,18 +242,20 @@ async def delete_product(request: Request, product_id: int, db: Session = db_dep
 
 
 @router.post("/check-prices")
-@limiter.limit("10/minute")  # Stricter limit for expensive operation
-async def check_prices(request: Request, db: Session = db_dependency):
-    """
-    Check prices for all tracked products and send notifications if target price is reached.
-    """
-    logger.info("Checking prices for all tracked products")
+@limiter.limit("10/minute")
+async def check_prices(
+    request: Request,
+    current_user: DBUser = _current_user_dependency,
+    db: Session = _db_dependency,
+):
+    """Check prices for all tracked products of the authenticated user."""
+    logger.info(f"Checking prices for user {current_user.id}'s products")
 
     try:
-        products = db.query(DBProduct).all()
+        products = db.query(DBProduct).filter(DBProduct.user_id == current_user.id).all()
 
         if not products:
-            logger.info("No products to check prices for")
+            logger.info(f"No products to check prices for user {current_user.id}")
             return {"message": "No products to check prices for"}
 
         notifications_sent = 0
@@ -244,7 +264,6 @@ async def check_prices(request: Request, db: Session = db_dependency):
             logger.debug(f"Checking price for product: {product.title} (ID: {product.id})")
 
             try:
-                # Scrape current price
                 product_info = scrape_product_info(str(product.url))
 
                 if not product_info:
@@ -256,7 +275,6 @@ async def check_prices(request: Request, db: Session = db_dependency):
                     logger.warning(f"Could not parse price for {product.url}")
                     continue
 
-                # Add to price history
                 price_history = PriceHistory(
                     product_id=product.id,
                     price=current_price,
@@ -265,13 +283,11 @@ async def check_prices(request: Request, db: Session = db_dependency):
                 db.add(price_history)
                 db.commit()
 
-                # Check if target price is reached
                 if current_price <= product.target_price:
                     logger.info(
                         f"Target price reached for product: {product.title} (ID: {product.id})"
                     )
 
-                    # Send notification
                     message = f"🎯 Target price reached for {product.title}!\n"
                     message += f"Current price: ${current_price}\n"
                     message += f"Target price: ${product.target_price}\n"
@@ -280,7 +296,6 @@ async def check_prices(request: Request, db: Session = db_dependency):
                     send_signal_message_to_group(settings.SIGNAL_GROUP_ID, message)
                     notifications_sent += 1
 
-                    # Update price alerts metric
                     PRICE_ALERTS_SENT.inc()
 
             except Exception as e:
