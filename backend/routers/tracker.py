@@ -40,6 +40,32 @@ class ProductResponse(BaseModel):
     updated_at: datetime
 
 
+def get_latest_price(db: Session, product_id: int) -> Optional[float]:
+    """Get the latest price for a product from price history."""
+    latest_price = (
+        db.query(PriceHistory)
+        .filter(PriceHistory.product_id == product_id)
+        .order_by(PriceHistory.timestamp.desc())
+        .first()
+    )
+    return latest_price.price if latest_price else None
+
+
+def build_product_response(product: DBProduct, current_price: Optional[float]) -> dict:
+    """Build a product response dictionary from a database product."""
+    return {
+        "id": product.id,
+        "url": product.url,
+        "title": product.title,
+        "description": product.description,
+        "image_url": product.image_url,
+        "target_price": product.target_price,
+        "current_price": current_price,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+    }
+
+
 @router.post("/track", response_model=ProductResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def track_product(request: Request, product: Product, db: Session = db_dependency):
@@ -106,18 +132,7 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
 
         logger.info(f"Product tracked successfully: {db_product.title} (ID: {db_product.id})")
 
-        # Return response
-        return {
-            "id": db_product.id,
-            "url": db_product.url,
-            "title": db_product.title,
-            "description": db_product.description,
-            "image_url": db_product.image_url,
-            "target_price": db_product.target_price,
-            "current_price": current_price,
-            "created_at": db_product.created_at,
-            "updated_at": db_product.updated_at,
-        }
+        return build_product_response(db_product, current_price)
 
     except Exception as e:
         db.rollback()
@@ -136,31 +151,10 @@ async def get_tracked_products(request: Request, db: Session = db_dependency):
     try:
         products = db.query(DBProduct).all()
 
-        response = []
-        for product in products:
-            # Get latest price
-            latest_price = (
-                db.query(PriceHistory)
-                .filter(PriceHistory.product_id == product.id)
-                .order_by(PriceHistory.timestamp.desc())
-                .first()
-            )
-
-            current_price = latest_price.price if latest_price else None
-
-            response.append(
-                {
-                    "id": product.id,
-                    "url": product.url,
-                    "title": product.title,
-                    "description": product.description,
-                    "image_url": product.image_url,
-                    "target_price": product.target_price,
-                    "current_price": current_price,
-                    "created_at": product.created_at,
-                    "updated_at": product.updated_at,
-                }
-            )
+        response = [
+            build_product_response(product, get_latest_price(db, product.id))  # type: ignore[arg-type]
+            for product in products
+        ]
 
         logger.debug(f"Retrieved {len(response)} tracked products")
         return response
@@ -186,28 +180,10 @@ async def get_product(request: Request, product_id: int, db: Session = db_depend
             logger.warning(f"Product not found: ID {product_id}")
             raise HTTPException(status_code=404, detail="Product not found")
 
-        # Get latest price
-        latest_price = (
-            db.query(PriceHistory)
-            .filter(PriceHistory.product_id == product.id)
-            .order_by(PriceHistory.timestamp.desc())
-            .first()
-        )
-
-        current_price = latest_price.price if latest_price else None
+        current_price = get_latest_price(db, product.id)
 
         logger.debug(f"Retrieved product: {product.title} (ID: {product.id})")
-        return {
-            "id": product.id,
-            "url": product.url,
-            "title": product.title,
-            "description": product.description,
-            "image_url": product.image_url,
-            "target_price": product.target_price,
-            "current_price": current_price,
-            "created_at": product.created_at,
-            "updated_at": product.updated_at,
-        }
+        return build_product_response(product, current_price)
 
     except HTTPException:
         raise
