@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -14,43 +13,22 @@ from models import User as DBUser
 from models import get_db_session
 from utils.logging import get_logger
 
-# Setup logger
 logger = get_logger("security")
 
-# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings from config
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# OAuth2 scheme - tokenUrl matches the auth router endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
-# Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
 
-# Models
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
-
-
-class UserInDB(User):
-    hashed_password: str
 
 
 class UserCreate(BaseModel):
@@ -65,29 +43,25 @@ class UserResponse(BaseModel):
 
     id: int
     email: str
-    signal_phone: Optional[str] = None
-    signal_username: Optional[str] = None
+    signal_phone: str | None = None
+    signal_username: str | None = None
 
     model_config = {"from_attributes": True}
 
 
-# Password functions
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-# User functions
 def get_user_by_email(db_session, email: str) -> DBUser | None:
-    """Get a user by email from the database."""
     return db_session.query(DBUser).filter(DBUser.email == email).first()
 
 
 def create_user(db_session, email: str, password: str) -> DBUser:
-    """Create a new user in the database."""
     hashed_password = get_password_hash(password)
     user = DBUser(email=email, password_hash=hashed_password)
     db_session.add(user)
@@ -97,31 +71,22 @@ def create_user(db_session, email: str, password: str) -> DBUser:
 
 
 def authenticate_user_db(db_session, email: str, password: str) -> DBUser | None:
-    """Authenticate a user against the database."""
     user = get_user_by_email(db_session, email)
-    if not user:
+    if not user or not user.password_hash:
         return None
-    if not user.password_hash:
-        return None
-    if not verify_password(password, user.password_hash):
+    if not verify_password(password, str(user.password_hash)):
         return None
     return user
 
 
-# Token functions
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(minutes=15)
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Get the current user from the JWT token."""
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> DBUser:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -145,59 +110,29 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         db_session.close()
 
 
-# Create a module-level singleton for the current_user dependency
-current_user_dependency = Depends(get_current_user)
+_current_user_dependency = Depends(get_current_user)
 
 
-async def get_current_active_user(current_user: DBUser = current_user_dependency):
-    """Get the current active user. Returns the user if authenticated."""
+async def get_current_active_user(current_user: DBUser = _current_user_dependency) -> DBUser:
     return current_user
 
 
-# IP blocking
-blocked_ips = set()
+blocked_ips: set[str] = set()
 
 
 def is_ip_blocked(request: Request) -> bool:
-    """
-    Check if an IP is blocked.
-
-    Args:
-        request (Request): The FastAPI request object.
-
-    Returns:
-        bool: True if the IP is blocked, False otherwise.
-    """
     client_ip = get_remote_address(request)
     return client_ip in blocked_ips
 
 
-def block_ip(ip: str, duration: int = 3600):
-    """
-    Block an IP address for a specified duration.
-
-    Args:
-        ip (str): The IP address to block.
-        duration (int): The duration in seconds to block the IP.
-    """
+def block_ip(ip: str, duration: int = 3600) -> None:
     blocked_ips.add(ip)
     logger.warning(f"Blocked IP: {ip} for {duration} seconds")
 
-    # In a real implementation, you would use a background task to unblock the IP after the duration
-    # For now, we'll just add it to the set
 
-
-def setup_security(app: FastAPI):
-    """
-    Set up security for a FastAPI application.
-
-    Args:
-        app (FastAPI): The FastAPI application.
-    """
-    # Add rate limiter middleware
+def setup_security(app: FastAPI) -> None:
     app.state.limiter = limiter
 
-    # Add IP blocking middleware
     @app.middleware("http")
     async def block_banned_ips(request: Request, call_next):
         if is_ip_blocked(request):

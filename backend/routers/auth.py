@@ -20,21 +20,17 @@ from utils.security import (
     limiter,
 )
 
-# Setup logger
 logger = get_logger("auth")
 
-# Create router
 router = APIRouter()
 
-# Module-level singletons for dependencies
-form_data_dependency = Depends(OAuth2PasswordRequestForm)
-current_user_dependency = Depends(get_current_active_user)
+_form_data_dependency = Depends(OAuth2PasswordRequestForm)
+_current_user_dependency = Depends(get_current_active_user)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def register_user(request: Request, user_data: UserCreate):
-    """Register a new user with email and password."""
+async def register_user(request: Request, user_data: UserCreate) -> DBUser:
     db_session = get_db_session()
     try:
         existing_user = get_user_by_email(db_session, user_data.email)
@@ -63,9 +59,8 @@ async def register_user(request: Request, user_data: UserCreate):
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def login_for_access_token(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = form_data_dependency,
-):
-    """OAuth2 compatible token login endpoint. Uses email as username."""
+    form_data: OAuth2PasswordRequestForm = _form_data_dependency,
+) -> Token:
     db_session = get_db_session()
     try:
         user = authenticate_user_db(db_session, form_data.username, form_data.password)
@@ -87,6 +82,5 @@ async def login_for_access_token(
 
 
 @router.get("/me", response_model=UserResponse)
-async def read_users_me(current_user: DBUser = current_user_dependency):
-    """Get current authenticated user information."""
+async def read_users_me(current_user: DBUser = _current_user_dependency) -> DBUser:
     return current_user
