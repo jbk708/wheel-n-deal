@@ -1,5 +1,5 @@
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
@@ -29,8 +29,12 @@ class Product(Base):
     description = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
     target_price = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     price_history = relationship(
         "PriceHistory", back_populates="product", cascade="all, delete-orphan"
@@ -43,7 +47,7 @@ class PriceHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     price = Column(Float)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     product = relationship("Product", back_populates="price_history")
 

@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -54,10 +54,11 @@ class Settings(BaseSettings):
     # Price check settings
     PRICE_CHECK_INTERVAL: int = 3600  # seconds (1 hour)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
 
 
 # Create settings instance
@@ -68,7 +69,7 @@ if settings.DEBUG:
     import json
 
     print(f"=== {settings.APP_NAME} Configuration ===")
-    config_dict = {k: v for k, v in settings.dict().items() if not k.startswith("_")}
+    config_dict = {k: v for k, v in settings.model_dump().items() if not k.startswith("_")}
     # Hide sensitive information
     for key in ["SECRET_KEY", "DATABASE_URL", "SIGNAL_PHONE_NUMBER", "SIGNAL_GROUP_ID"]:
         if config_dict.get(key):
