@@ -4,7 +4,6 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-026 | Implement user registration/login endpoints (replace fake_users_db) | In Progress | feat-WND-026-user-registration |
 
 ## Backlog
 
@@ -37,6 +36,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-026 | Implement user registration/login endpoints (replace fake_users_db) | 2026-01-16 | #30 |
 | WND-025 | Add user_id FK to Product, enable per-user tracking | 2026-01-16 | #29 |
 | WND-024 | Add User model with Signal phone, username, created_at | 2026-01-16 | #28 |
 | WND-023 | Top-level file cleanup and setup script updates | 2026-01-16 | #25 |

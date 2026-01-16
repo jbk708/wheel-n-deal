@@ -255,7 +255,8 @@ class MockSubprocessResult:
 @patch("services.listener.subprocess.run")
 @patch("services.listener.time.sleep")
 @patch("services.listener.parse_message")
-@patch("services.listener.track_product")
+@patch("services.listener.scrape_product_info")
+@patch("services.listener.get_db_session")
 @patch("services.listener.send_signal_message_to_group")
 @patch("services.listener.handle_help_message")
 @patch("services.listener.handle_list_tracked_items")
@@ -267,7 +268,8 @@ def test_listen_to_group_track_command(
     mock_list_items,
     mock_help_message,
     mock_send_message,
-    mock_track_product,
+    mock_get_db_session,
+    mock_scrape,
     mock_parse_message,
     mock_sleep,
     mock_run,
@@ -288,11 +290,16 @@ def test_listen_to_group_track_command(
         "target_price": 90.0,
     }
 
-    # Set up the mock track_product result
-    mock_track_product.return_value = {
-        "message": "Product is now being tracked",
-        "product_info": {"title": "Test Product", "price": "$100"},
-        "target_price": 90.0,
+    # Set up the mock database session
+    mock_session = MagicMock()
+    mock_get_db_session.return_value = mock_session
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    # Set up mock scrape result
+    mock_scrape.return_value = {
+        "title": "Test Product",
+        "price": "$100.00",
+        "price_float": 100.0,
     }
 
     # Make the function exit after one iteration
@@ -307,6 +314,8 @@ def test_listen_to_group_track_command(
     mock_parse_message.assert_called_once_with(
         "test-group-id: track https://example.com/product 90.00"
     )
-    mock_track_product.assert_called_once()
+    mock_scrape.assert_called_once_with("https://example.com/product")
+    mock_session.add.assert_called_once()
+    mock_session.commit.assert_called_once()
     mock_send_message.assert_called_once()
     mock_sleep.assert_called_once()
