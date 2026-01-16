@@ -65,8 +65,9 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
             raise HTTPException(status_code=400, detail="Failed to scrape product information")
 
         # Set target price if not provided
-        if not product.target_price:
-            product.target_price = round(product_info["price"] * 0.9, 2)  # 10% discount
+        current_price = product_info.get("price_float")
+        if not product.target_price and current_price:
+            product.target_price = round(current_price * 0.9, 2)  # 10% discount
             logger.info(f"Target price set to {product.target_price} (10% off current price)")
 
         # Create new product
@@ -85,7 +86,7 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
         # Add price history entry
         price_history = PriceHistory(
             product_id=db_product.id,
-            price=product_info["price"],
+            price=current_price,
         )
 
         db.add(price_history)
@@ -100,7 +101,7 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
         check_price.apply_async(args=[product.url, product.target_price])
 
         # Send notification
-        message = f"Product is now being tracked: {product_info['title']} at ${product_info['price']}. Target price is ${product.target_price}."
+        message = f"Product is now being tracked: {product_info['title']} at {product_info['price']}. Target price is ${product.target_price}."
         send_signal_message_to_group(settings.SIGNAL_GROUP_ID, message)
 
         logger.info(f"Product tracked successfully: {db_product.title} (ID: {db_product.id})")
@@ -113,7 +114,7 @@ async def track_product(request: Request, product: Product, db: Session = db_dep
             "description": db_product.description,
             "image_url": db_product.image_url,
             "target_price": db_product.target_price,
-            "current_price": product_info["price"],
+            "current_price": current_price,
             "created_at": db_product.created_at,
             "updated_at": db_product.updated_at,
         }
@@ -274,7 +275,10 @@ async def check_prices(request: Request, db: Session = db_dependency):
                     logger.warning(f"Failed to scrape product info: {product.url}")
                     continue
 
-                current_price = product_info["price"]
+                current_price = product_info.get("price_float")
+                if current_price is None:
+                    logger.warning(f"Could not parse price for {product.url}")
+                    continue
 
                 # Add to price history
                 price_history = PriceHistory(

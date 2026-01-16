@@ -21,7 +21,8 @@ def mock_request():
 # Mock data for the product_info returned by scrape_product_info
 mock_product_info = {
     "title": "Test Product",
-    "price": 100.0,
+    "price": "$100.00",
+    "price_float": 100.0,
     "url": "https://example.com/product",
     "description": "A test product",
     "image_url": "https://example.com/image.jpg",
@@ -90,7 +91,7 @@ async def test_track_product_success(
     assert response["url"] == valid_product.url
     assert response["title"] == mock_product_info["title"]
     assert response["target_price"] == valid_product.target_price
-    assert response["current_price"] == mock_product_info["price"]
+    assert response["current_price"] == mock_product_info["price_float"]
 
 
 # Test for product tracking without a target price

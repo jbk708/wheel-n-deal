@@ -155,7 +155,6 @@ From the project root:
 ### Known Issues
 
 **Medium Priority**:
-- Price type inconsistency: sometimes string (`"$80"`), sometimes float
 - Integration tests in `tests/integration/` are skipped
 
 **Low Priority**:

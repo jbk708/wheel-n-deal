@@ -9,10 +9,11 @@ from tasks.price_check import check_price
 def mock_scraper():
     """Mock the scraper function."""
     with patch("tasks.price_check.scrape_product_info") as mock:
-        # Mock the scraper to return a valid product
+        # Mock the scraper to return a valid product with price_float
         mock.return_value = {
             "title": "Test Product",
-            "price": "$80",
+            "price": "$80.00",
+            "price_float": 80.0,
             "url": "https://example.com/product",
         }
         yield mock
@@ -63,7 +64,7 @@ def test_check_price_task_price_drop(mock_scraper, mock_db_session, mock_signal,
 
     # Verify that a notification was sent
     mock_signal.assert_called_once_with(
-        f"Price drop alert! Test Product is now $80.\nTarget price was 90.0.\nURL: {url}"
+        f"Price drop alert! Test Product is now $80.00.\nTarget price was 90.0.\nURL: {url}"
     )
 
     # Verify that the task was rescheduled
