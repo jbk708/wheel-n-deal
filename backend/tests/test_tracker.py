@@ -50,7 +50,12 @@ def invalid_product():
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_success(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product, mock_request
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -133,7 +138,12 @@ async def test_track_product_no_target_price(
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_existing(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product, mock_request
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -173,7 +183,12 @@ async def test_track_product_existing(
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_database_error(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product, mock_request
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
