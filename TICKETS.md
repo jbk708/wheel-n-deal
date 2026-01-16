@@ -9,7 +9,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-018 | Extract helper functions in tracker.py to reduce duplication | Low |
 | WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
 | WND-020 | Update setup instructions | Low |
 | WND-021 | Codebase consolidation and simplification review | Low |
@@ -18,6 +17,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-018 | Extract helper functions in tracker.py | 2026-01-16 | #20 |
 | WND-017 | Consolidate duplicate test files | 2026-01-16 | #19 |
 | WND-016 | Migrate to Python 3.12+ | 2026-01-16 | #18 |
 | WND-010 | Add database connection pooling configuration | 2026-01-16 | #17 |
