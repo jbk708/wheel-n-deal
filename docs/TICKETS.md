@@ -9,6 +9,31 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
+| **Phase 1: User Identity Foundation** | | |
+| WND-024 | Add User model with Signal phone, username, created_at | High |
+| WND-025 | Add user_id FK to Product, remove URL unique constraint | High |
+| WND-026 | Implement user registration/login endpoints (replace fake_users_db) | High |
+| WND-027 | Update tracker API to filter products by authenticated user | High |
+| **Phase 2: Command Prefix & Per-User Tracking** | | |
+| WND-028 | Parse sender phone/username from signal-cli JSON output | High |
+| WND-029 | Auto-create User record for new Signal senders | High |
+| WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | High |
+| WND-031 | Scope all commands to sender's own product list | High |
+| WND-032 | Add !me command to show user's Signal identity/stats | Medium |
+| **Phase 3: React Web Interface** | | |
+| WND-033 | Initialize React frontend with Vite, TailwindCSS, React Router | Medium |
+| WND-034 | Auth pages - login, register, password reset | Medium |
+| WND-035 | Dashboard - list tracked products with current/target prices | Medium |
+| WND-036 | Add product form with URL validation and retailer detection | Medium |
+| WND-037 | Price history chart per product (recharts or chart.js) | Medium |
+| WND-038 | Product detail page with edit target price, delete | Medium |
+| WND-039 | Settings page - notification preferences, account management | Low |
+| **Phase 4: Signal Bot Framework (Monorepo)** | | |
+| WND-040 | Restructure repo: packages/signal-bot-core, packages/wheel-n-deal | Low |
+| WND-041 | Extract SignalBot base class with message parsing, routing | Low |
+| WND-042 | Define command plugin interface (register, execute, help text) | Low |
+| WND-043 | Refactor wheel-n-deal as signal-bot-core plugin | Low |
+| WND-044 | Add example plugin template for new bot functionality | Low |
 
 ## Completed
 
