@@ -9,7 +9,6 @@
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
 | WND-010 | Add database connection pooling configuration | Low |
 | WND-016 | Migrate to Python 3.12+ | Low |
 | WND-017 | Consolidate duplicate test files (test_tracker.py, test_api_endpoints.py) | Low |
@@ -17,12 +16,12 @@
 | WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
 | WND-020 | Update setup instructions | Low |
 | WND-021 | Codebase consolidation and simplification review | Low |
-| WND-022 | Review and fix deprecation warnings for all packages | Medium |
 
 ## Completed
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | 2026-01-16 | #16 |
 | WND-022 | Review and fix deprecation warnings for all packages | 2026-01-16 | #15 |
 | WND-015 | Replace deprecated datetime.utcnow() with timezone-aware | 2026-01-16 | #15 |
 | WND-014 | Fix type errors reported by ty (4 errors) | 2026-01-16 | #14 |
