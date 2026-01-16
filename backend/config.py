@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./wheel_n_deal.db")
 
+    # Database connection pooling (ignored for SQLite)
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_PRE_PING: bool = True
+
     # Signal settings
     SIGNAL_PHONE_NUMBER: str = os.getenv("SIGNAL_PHONE_NUMBER", "")
     SIGNAL_GROUP_ID: str = os.getenv("SIGNAL_GROUP_ID", "")
