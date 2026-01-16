@@ -21,6 +21,9 @@
 | WND-014 | Fix type errors reported by ty (4 errors) | Medium |
 | WND-015 | Replace deprecated datetime.utcnow() with timezone-aware | Low |
 | WND-016 | Migrate to Python 3.12+ | Low |
+| WND-017 | Consolidate duplicate test files (test_tracker.py, test_api_endpoints.py) | Low |
+| WND-018 | Extract helper functions in tracker.py to reduce duplication | Low |
+| WND-019 | Remove unused rate_limit wrapper function in security.py | Low |
 
 ## Completed
 
