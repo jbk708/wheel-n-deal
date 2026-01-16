@@ -4,7 +4,7 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-011 | Migrate from Poetry to uv for package/env management | In Progress | `feat-WND-011-uv-migration` |
+| | | | |
 
 ## Backlog
 
@@ -27,4 +27,4 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
-| | | | |
+| WND-011 | Migrate from Poetry to uv for package/env management | 2026-01-16 | #2 |
