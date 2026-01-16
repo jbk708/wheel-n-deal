@@ -2,8 +2,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from routers.tracker import Product, get_tracked_products, track_product
+
+
+@pytest.fixture
+def mock_request():
+    """Mock the Starlette request object for rate limiting."""
+    mock_req = MagicMock(spec=Request)
+    mock_req.client.host = "127.0.0.1"
+    mock_req.app = MagicMock()
+    mock_req.app.state.limiter = MagicMock()
+    mock_req.state = MagicMock()
+    return mock_req
+
 
 # Mock data for the product_info returned by scrape_product_info
 mock_product_info = {
@@ -37,7 +50,12 @@ def invalid_product():
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_success(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -47,7 +65,7 @@ async def test_track_product_success(
     mock_session.query.return_value.filter.return_value.first.return_value = None
 
     # Call the function directly with the mock session instead of using Depends
-    response = await track_product(valid_product, mock_session)
+    response = await track_product(mock_request, valid_product, mock_session)
 
     # Verify that scrape_product_info was called with the correct URL
     mock_scrape.assert_called_once_with(valid_product.url)
@@ -87,6 +105,7 @@ async def test_track_product_no_target_price(
     mock_send_signal,
     mock_scrape,
     product_without_target_price,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -96,7 +115,7 @@ async def test_track_product_no_target_price(
     mock_session.query.return_value.filter.return_value.first.return_value = None
 
     # Call the function directly with the mock session
-    await track_product(product_without_target_price, mock_session)
+    await track_product(mock_request, product_without_target_price, mock_session)
 
     # Verify that a target price was set (90% of current price)
     assert product_without_target_price.target_price == 90.0  # 90% of $100
@@ -119,7 +138,12 @@ async def test_track_product_no_target_price(
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_existing(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -135,7 +159,7 @@ async def test_track_product_existing(
 
     # Call the function and expect an exception
     with pytest.raises(HTTPException) as exc_info:
-        await track_product(valid_product, mock_session)
+        await track_product(mock_request, valid_product, mock_session)
 
     # Verify that an HTTPException was raised with a 400 status code
     assert exc_info.value.status_code == 400
@@ -159,7 +183,12 @@ async def test_track_product_existing(
 @patch("tasks.price_check.check_price.apply_async")
 @patch("routers.tracker.get_db_session")
 async def test_track_product_database_error(
-    mock_get_db_session, mock_apply_async, mock_send_signal, mock_scrape, valid_product
+    mock_get_db_session,
+    mock_apply_async,
+    mock_send_signal,
+    mock_scrape,
+    valid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -173,7 +202,7 @@ async def test_track_product_database_error(
 
     # Call the function and expect an exception
     with pytest.raises(HTTPException) as exc_info:
-        await track_product(valid_product, mock_session)
+        await track_product(mock_request, valid_product, mock_session)
 
     # Verify that an HTTPException was raised with a 500 status code
     assert exc_info.value.status_code == 500
@@ -195,6 +224,7 @@ async def test_track_product_scraping_failure(
     mock_send_signal,
     mock_scrape,
     invalid_product,
+    mock_request,
 ):
     # Mock the database session
     mock_session = MagicMock()
@@ -205,7 +235,7 @@ async def test_track_product_scraping_failure(
 
     # Call the function and expect an exception
     with pytest.raises(HTTPException) as exc_info:
-        await track_product(invalid_product, mock_session)
+        await track_product(mock_request, invalid_product, mock_session)
 
     # Verify that an HTTPException was raised with a 500 status code
     assert exc_info.value.status_code == 500
@@ -215,7 +245,7 @@ async def test_track_product_scraping_failure(
 # Test for successful retrieval of tracked products
 @pytest.mark.asyncio
 @patch("routers.tracker.get_db_session")
-async def test_get_products_success(mock_get_db_session):
+async def test_get_products_success(mock_get_db_session, mock_request):
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
@@ -255,7 +285,7 @@ async def test_get_products_success(mock_get_db_session):
     mock_filter.order_by.return_value = mock_order_by
     mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]
 
-    response = await get_tracked_products(mock_session)
+    response = await get_tracked_products(mock_request, mock_session)
 
     # Verify the response
     assert len(response) == 2
@@ -270,7 +300,7 @@ async def test_get_products_success(mock_get_db_session):
 # Test for error during retrieval of tracked products
 @pytest.mark.asyncio
 @patch("routers.tracker.get_db_session")
-async def test_get_products_error(mock_get_db_session):
+async def test_get_products_error(mock_get_db_session, mock_request):
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
@@ -279,7 +309,7 @@ async def test_get_products_error(mock_get_db_session):
     mock_session.query.side_effect = Exception("Database error")
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_tracked_products(mock_session)
+        await get_tracked_products(mock_request, mock_session)
 
     # Verify that an HTTPException was raised with a 500 status code
     assert exc_info.value.status_code == 500

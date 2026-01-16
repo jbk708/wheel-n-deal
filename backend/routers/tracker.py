@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from services.notification import send_signal_message_to_group
 from services.scraper import scrape_product_info
 from utils.logging import get_logger
 from utils.monitoring import PRICE_ALERTS_SENT, TRACKED_PRODUCTS
+from utils.security import limiter
 
 # Setup logger
 logger = get_logger("tracker")
@@ -40,7 +41,8 @@ class ProductResponse(BaseModel):
 
 
 @router.post("/track", response_model=ProductResponse)
-async def track_product(product: Product, db: Session = db_dependency):
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def track_product(request: Request, product: Product, db: Session = db_dependency):
     """
     Track a product by URL with an optional target price.
     If target_price is not provided, it will be set to 90% of the current price.
@@ -123,7 +125,8 @@ async def track_product(product: Product, db: Session = db_dependency):
 
 
 @router.get("/products", response_model=List[ProductResponse])
-async def get_tracked_products(db: Session = db_dependency):
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def get_tracked_products(request: Request, db: Session = db_dependency):
     """
     Get all tracked products with their current prices.
     """
@@ -169,7 +172,8 @@ async def get_tracked_products(db: Session = db_dependency):
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int, db: Session = db_dependency):
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def get_product(request: Request, product_id: int, db: Session = db_dependency):
     """
     Get a specific tracked product by ID.
     """
@@ -212,7 +216,8 @@ async def get_product(product_id: int, db: Session = db_dependency):
 
 
 @router.delete("/products/{product_id}")
-async def delete_product(product_id: int, db: Session = db_dependency):
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
+async def delete_product(request: Request, product_id: int, db: Session = db_dependency):
     """
     Delete a tracked product by ID.
     """
@@ -242,7 +247,8 @@ async def delete_product(product_id: int, db: Session = db_dependency):
 
 
 @router.post("/check-prices")
-async def check_prices(db: Session = db_dependency):
+@limiter.limit("10/minute")  # Stricter limit for expensive operation
+async def check_prices(request: Request, db: Session = db_dependency):
     """
     Check prices for all tracked products and send notifications if target price is reached.
     """

@@ -7,8 +7,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import make_wsgi_app
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from models import init_db
+from routers.auth import router as auth_router
 from routers.tracker import router as tracker_router
 from services.listener import listen_to_group
 from utils.logging import get_logger
@@ -70,10 +73,14 @@ app.add_middleware(
 # Add Prometheus middleware
 app.add_middleware(PrometheusMiddleware)
 
-# Setup security
+# Setup security (rate limiter, IP blocking)
 setup_security(app)
 
+# Add rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Include routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(tracker_router, prefix="/api/v1/tracker", tags=["tracker"])
 
 
