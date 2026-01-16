@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -10,97 +9,84 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from config import settings
+from models import User as DBUser
+from models import get_db_session
 from utils.logging import get_logger
 
-# Setup logger
 logger = get_logger("security")
 
-# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings from config
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# OAuth2 scheme - tokenUrl matches the auth router endpoint
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
-# Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
 
-# Models
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
+class UserCreate(BaseModel):
+    """Schema for user registration."""
+
+    email: str
+    password: str
 
 
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
+class UserResponse(BaseModel):
+    """Schema for user response (excludes password)."""
+
+    id: int
+    email: str
+    signal_phone: str | None = None
+    signal_username: str | None = None
+
+    model_config = {"from_attributes": True}
 
 
-class UserInDB(User):
-    hashed_password: str
-
-
-# Fake user database - replace with actual database in production
-fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "full_name": "Admin User",
-        "email": "admin@example.com",
-        "hashed_password": pwd_context.hash("adminpassword"),
-        "disabled": False,
-    }
-}
-
-
-# Password functions
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-# User functions
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
+def get_user_by_email(db_session, email: str) -> DBUser | None:
+    return db_session.query(DBUser).filter(DBUser.email == email).first()
 
 
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
-    if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
+def create_user(db_session, email: str, password: str) -> DBUser:
+    hashed_password = get_password_hash(password)
+    user = DBUser(email=email, password_hash=hashed_password)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
     return user
 
 
-# Token functions
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def authenticate_user_db(db_session, email: str, password: str) -> DBUser | None:
+    user = get_user_by_email(db_session, email)
+    if not user or not user.password_hash:
+        return None
+    if not verify_password(password, str(user.password_hash)):
+        return None
+    return user
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(minutes=15)
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> DBUser:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -108,71 +94,45 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception from None
-    user = get_user(fake_users_db, username=username)
-    if user is None:
-        raise credentials_exception
-    return user
+
+    db_session = get_db_session()
+    try:
+        user = get_user_by_email(db_session, email)
+        if user is None:
+            raise credentials_exception
+        return user
+    finally:
+        db_session.close()
 
 
-# Create a module-level singleton for the current_user dependency
-current_user_dependency = Depends(get_current_user)
+_current_user_dependency = Depends(get_current_user)
 
 
-async def get_current_active_user(current_user: User = current_user_dependency):
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
+async def get_current_active_user(current_user: DBUser = _current_user_dependency) -> DBUser:
     return current_user
 
 
-# IP blocking
-blocked_ips = set()
+blocked_ips: set[str] = set()
 
 
 def is_ip_blocked(request: Request) -> bool:
-    """
-    Check if an IP is blocked.
-
-    Args:
-        request (Request): The FastAPI request object.
-
-    Returns:
-        bool: True if the IP is blocked, False otherwise.
-    """
     client_ip = get_remote_address(request)
     return client_ip in blocked_ips
 
 
-def block_ip(ip: str, duration: int = 3600):
-    """
-    Block an IP address for a specified duration.
-
-    Args:
-        ip (str): The IP address to block.
-        duration (int): The duration in seconds to block the IP.
-    """
+def block_ip(ip: str, duration: int = 3600) -> None:
     blocked_ips.add(ip)
     logger.warning(f"Blocked IP: {ip} for {duration} seconds")
 
-    # In a real implementation, you would use a background task to unblock the IP after the duration
-    # For now, we'll just add it to the set
 
-
-def setup_security(app: FastAPI):
-    """
-    Set up security for a FastAPI application.
-
-    Args:
-        app (FastAPI): The FastAPI application.
-    """
-    # Add rate limiter middleware
+def setup_security(app: FastAPI) -> None:
     app.state.limiter = limiter
 
-    # Add IP blocking middleware
     @app.middleware("http")
     async def block_banned_ips(request: Request, call_next):
         if is_ip_blocked(request):

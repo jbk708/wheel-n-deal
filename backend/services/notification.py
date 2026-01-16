@@ -1,5 +1,4 @@
 import subprocess
-from typing import Optional
 
 from config import settings
 from utils.logging import get_logger
@@ -9,7 +8,7 @@ from utils.monitoring import SIGNAL_MESSAGES_FAILED, SIGNAL_MESSAGES_SENT
 logger = get_logger("notification")
 
 
-def send_signal_message_to_group(group_id: Optional[str] = None, message: str = ""):
+def send_signal_message_to_group(group_id: str | None = None, message: str = ""):
     """
     Sends a message to a Signal group using signal-cli.
 
