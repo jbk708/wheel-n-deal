@@ -87,7 +87,7 @@ class ScraperMetrics:
 
     def __init__(self, website):
         self.website = website
-        self.start_time = None
+        self.start_time: float | None = None
 
     def __enter__(self):
         self.start_time = time.time()
@@ -96,6 +96,9 @@ class ScraperMetrics:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.start_time is None:
+            return False
+
         latency = time.time() - self.start_time
         SCRAPER_LATENCY.labels(website=self.website).observe(latency)
 

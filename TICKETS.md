@@ -11,7 +11,6 @@
 |--------|-------------|----------|
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
 | WND-010 | Add database connection pooling configuration | Low |
-| WND-014 | Fix type errors reported by ty (4 errors) | Medium |
 | WND-015 | Replace deprecated datetime.utcnow() with timezone-aware | Low |
 | WND-016 | Migrate to Python 3.12+ | Low |
 | WND-017 | Consolidate duplicate test files (test_tracker.py, test_api_endpoints.py) | Low |
@@ -25,6 +24,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-014 | Fix type errors reported by ty (4 errors) | 2026-01-16 | #14 |
 | WND-008 | Re-enable and fix skipped integration tests | 2026-01-16 | #13 |
 | WND-007 | Standardize price type handling (string vs float) | 2026-01-16 | #12 |
 | WND-006 | Replace print() with logger in price_check.py | 2026-01-16 | #11 |

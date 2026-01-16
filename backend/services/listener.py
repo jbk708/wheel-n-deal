@@ -20,7 +20,7 @@ logger = get_logger("listener")
 # Define a simple Product model for incoming commands
 class Product(BaseModel):
     url: str
-    target_price: float = None  # Optional target price
+    target_price: float | None = None  # Optional target price
 
 
 def parse_message(message: str):

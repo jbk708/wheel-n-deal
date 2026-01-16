@@ -269,7 +269,7 @@ async def check_prices(request: Request, db: Session = db_dependency):
 
             try:
                 # Scrape current price
-                product_info = scrape_product_info(product.url)
+                product_info = scrape_product_info(str(product.url))
 
                 if not product_info:
                     logger.warning(f"Failed to scrape product info: {product.url}")
