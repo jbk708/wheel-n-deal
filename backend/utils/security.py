@@ -129,21 +129,6 @@ async def get_current_active_user(current_user: User = current_user_dependency):
     return current_user
 
 
-# Rate limiting decorator
-def rate_limit(limit: str, key_func=get_remote_address):
-    """
-    Rate limiting decorator for FastAPI endpoints.
-
-    Args:
-        limit (str): The rate limit string (e.g., "5/minute", "100/hour").
-        key_func (callable): Function to extract the key from the request.
-
-    Returns:
-        callable: The decorated function.
-    """
-    return limiter.limit(limit, key_func=key_func)
-
-
 # IP blocking
 blocked_ips = set()
 
