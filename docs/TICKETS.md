@@ -4,7 +4,6 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-023 | Top-level file cleanup and setup script updates | In Progress | refactor-WND-023-top-level-cleanup |
 
 ## Backlog
 
@@ -15,6 +14,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-023 | Top-level file cleanup and setup script updates | 2026-01-16 | #25 |
 | WND-021 | Codebase consolidation and simplification review | 2026-01-16 | #23 |
 | WND-020 | Update setup instructions | 2026-01-16 | #22 |
 | WND-019 | Remove unused rate_limit wrapper function | 2026-01-16 | #21 |
