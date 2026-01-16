@@ -155,7 +155,6 @@ From the project root:
 ### Known Issues
 
 **Medium Priority**:
-- `tasks/price_check.py` uses `print()` instead of logger
 - Price type inconsistency: sometimes string (`"$80"`), sometimes float
 - Integration tests in `tests/integration/` are skipped
 
@@ -168,7 +167,6 @@ From the project root:
 
 | Issue | Location | Fix |
 |-------|----------|-----|
-| Replace print with logger | `tasks/price_check.py` | Use `get_logger()` |
 | Re-enable integration tests | `tests/integration/` | Debug and fix skipped tests |
 
 See `ARCHITECTURE.md` for system design details.

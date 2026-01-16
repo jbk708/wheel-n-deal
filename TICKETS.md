@@ -4,13 +4,12 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
-| WND-004 | Consolidate duplicate model definitions | In Progress | feat-WND-004-consolidate-models |
+| WND-006 | Replace print() with logger in price_check.py | In Progress | feat-WND-006-logger-price-check |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
-| WND-006 | Replace print() with logger in price_check.py | Medium |
 | WND-007 | Standardize price type handling (string vs float) | Medium |
 | WND-008 | Re-enable and fix skipped integration tests | Medium |
 | WND-009 | Use settings.METRICS_PORT instead of hardcoded 8001 | Low |
@@ -27,6 +26,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-004 | Consolidate duplicate model definitions | 2026-01-16 | #10 |
 | WND-003 | Fix CORS to restrict allowed origins | 2026-01-16 | #9 |
 | WND-002 | Wire security routes to API (auth, rate limiting) | 2026-01-16 | #8 |
 | WND-001 | Set up Alembic migrations | 2026-01-16 | #7 |
