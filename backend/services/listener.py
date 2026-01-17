@@ -248,22 +248,25 @@ def handle_track_command(url: str, target_price: float | None, user_id: int) -> 
             return f"Failed to scrape product info for: {url}"
 
         current_price = product_info.get("price_float")
-        if target_price is None and current_price:
+        if not current_price:
+            title = product_info.get("title", "Unknown")
+            return f"Could not find price for: {title}\nThe site may not be supported yet."
+
+        if target_price is None:
             target_price = round(current_price * 0.9, 2)
 
         db_product = DBProduct(
             url=url,
             title=product_info.get("title", "Unknown"),
-            target_price=target_price or 0,
+            target_price=target_price,
             user_id=user_id,
         )
         db.add(db_product)
         db.flush()  # Get the product ID before committing
 
         # Store initial price in history
-        if current_price:
-            initial_price = PriceHistory(product_id=db_product.id, price=current_price)
-            db.add(initial_price)
+        initial_price = PriceHistory(product_id=db_product.id, price=current_price)
+        db.add(initial_price)
 
         db.commit()
         TRACKED_PRODUCTS.inc()
