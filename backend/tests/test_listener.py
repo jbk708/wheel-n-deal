@@ -139,23 +139,23 @@ def test_handle_help_message():
 
 @patch("services.listener.get_db_session")
 def test_handle_list_tracked_items_empty(mock_get_db_session):
-    """Test listing tracked items when there are none."""
+    """Test listing tracked items when there are none for the user."""
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
     # Mock the query result (empty list)
-    mock_session.query.return_value.all.return_value = []
+    mock_session.query.return_value.filter.return_value.all.return_value = []
 
-    result = handle_list_tracked_items()
+    result = handle_list_tracked_items(user_id=1)
 
-    assert "No products are currently being tracked" in result
+    assert "not tracking any products" in result
     mock_session.close.assert_called_once()
 
 
 @patch("services.listener.get_db_session")
 def test_handle_list_tracked_items_with_products(mock_get_db_session):
-    """Test listing tracked items when there are products."""
+    """Test listing tracked items when there are products for the user."""
     # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
@@ -173,9 +173,6 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     mock_product2.url = "https://example.com/product2"
     mock_product2.target_price = 80.0
 
-    # Mock the query result
-    mock_session.query.return_value.all.return_value = [mock_product1, mock_product2]
-
     # Mock the price history query
     mock_price_history1 = MagicMock()
     mock_price_history1.price = 100.0
@@ -183,17 +180,29 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     mock_price_history2 = MagicMock()
     mock_price_history2.price = 95.0
 
-    # Set up the filter and order_by chain for price history
-    mock_filter = MagicMock()
-    mock_order_by = MagicMock()
+    # Create separate mock chains for product query and price history queries
+    mock_product_filter = MagicMock()
+    mock_product_filter.all.return_value = [mock_product1, mock_product2]
 
-    mock_session.query.return_value.filter.return_value = mock_filter
-    mock_filter.order_by.return_value = mock_order_by
-    mock_order_by.first.side_effect = [mock_price_history1, mock_price_history2]
+    mock_price_filter = MagicMock()
+    mock_price_order = MagicMock()
+    mock_price_filter.order_by.return_value = mock_price_order
+    mock_price_order.first.side_effect = [mock_price_history1, mock_price_history2]
 
-    result = handle_list_tracked_items()
+    # Track which query is being called (DBProduct vs PriceHistory)
+    call_count = [0]
 
-    assert "Currently tracked products" in result
+    def mock_filter_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return mock_product_filter
+        return mock_price_filter
+
+    mock_session.query.return_value.filter.side_effect = mock_filter_side_effect
+
+    result = handle_list_tracked_items(user_id=1)
+
+    assert "Your tracked products" in result
     assert "Test Product 1" in result
     assert "Test Product 2" in result
     assert "Current price: $100.0" in result
@@ -217,10 +226,13 @@ def test_stop_tracking_item_valid(mock_get_db_session):
     mock_product2.id = 2
     mock_product2.title = "Test Product 2"
 
-    # Mock the query result
-    mock_session.query.return_value.all.return_value = [mock_product1, mock_product2]
+    # Mock the query result (filtered by user_id)
+    mock_session.query.return_value.filter.return_value.all.return_value = [
+        mock_product1,
+        mock_product2,
+    ]
 
-    result = stop_tracking_item(0)  # Stop tracking the first product
+    result = stop_tracking_item(0, user_id=1)  # Stop tracking the first product
 
     assert "Stopped tracking: Test Product 1" in result
     mock_session.delete.assert_called_once_with(mock_product1)
@@ -240,10 +252,10 @@ def test_stop_tracking_item_invalid_index(mock_get_db_session):
     mock_product1.id = 1
     mock_product1.title = "Test Product 1"
 
-    # Mock the query result
-    mock_session.query.return_value.all.return_value = [mock_product1]
+    # Mock the query result (filtered by user_id)
+    mock_session.query.return_value.filter.return_value.all.return_value = [mock_product1]
 
-    result = stop_tracking_item(1)  # Invalid index
+    result = stop_tracking_item(1, user_id=1)  # Invalid index
 
     assert "Invalid number" in result
     mock_session.delete.assert_not_called()
@@ -263,13 +275,13 @@ def test_stop_tracking_item_exception(mock_get_db_session):
     mock_product1.id = 1
     mock_product1.title = "Test Product 1"
 
-    # Mock the query result
-    mock_session.query.return_value.all.return_value = [mock_product1]
+    # Mock the query result (filtered by user_id)
+    mock_session.query.return_value.filter.return_value.all.return_value = [mock_product1]
 
     # Mock an exception during delete
     mock_session.delete.side_effect = Exception("Database error")
 
-    result = stop_tracking_item(0)
+    result = stop_tracking_item(0, user_id=1)
 
     assert "Error stopping tracking" in result
     mock_session.delete.assert_called_once_with(mock_product1)
@@ -278,33 +290,26 @@ def test_stop_tracking_item_exception(mock_get_db_session):
 
 
 class MockSubprocessResult:
-    def __init__(self, returncode, stdout_text):
+    def __init__(self, returncode: int, stdout_text: str):
         self.returncode = returncode
         self.stdout = stdout_text.encode("utf-8")
-
-    def decode(self):
-        return self.stdout.decode("utf-8")
 
 
 @patch("services.listener.subprocess.run")
 @patch("services.listener.time.sleep")
-@patch("services.listener.parse_message")
-@patch("services.listener.scrape_product_info")
+@patch("services.listener.parse_signal_json")
+@patch("services.listener.get_or_create_signal_user")
+@patch("services.listener.handle_track_command")
 @patch("services.listener.get_db_session")
 @patch("services.listener.send_signal_message_to_group")
-@patch("services.listener.handle_help_message")
-@patch("services.listener.handle_list_tracked_items")
-@patch("services.listener.stop_tracking_item")
 @patch("services.listener.settings")
 def test_listen_to_group_track_command(
     mock_settings,
-    mock_stop_tracking,
-    mock_list_items,
-    mock_help_message,
     mock_send_message,
     mock_get_db_session,
-    mock_scrape,
-    mock_parse_message,
+    mock_handle_track,
+    mock_get_or_create_user,
+    mock_parse_signal_json,
     mock_sleep,
     mock_run,
 ):
@@ -313,28 +318,29 @@ def test_listen_to_group_track_command(
     mock_settings.SIGNAL_GROUP_ID = "test-group-id"
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
 
-    # Set up the mock subprocess run result
-    mock_result = MockSubprocessResult(0, "test-group-id: !track https://example.com/product 90.00")
+    # Set up the mock subprocess run result (JSON output)
+    mock_result = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
     mock_run.return_value = mock_result
 
-    # Set up the mock parse_message result
-    mock_parse_message.return_value = {
-        "command": "track",
-        "url": "https://example.com/product",
-        "target_price": 90.0,
-    }
+    # Set up mock signal message from parse_signal_json
+    mock_signal_msg = MagicMock()
+    mock_signal_msg.group_id = "test-group-id"
+    mock_signal_msg.sender_phone = "+1234567890"
+    mock_signal_msg.sender_name = "Test User"
+    mock_signal_msg.message = "!track https://example.com/product 90.00"
+    mock_parse_signal_json.return_value = [mock_signal_msg]
+
+    # Set up mock user
+    mock_user = MagicMock()
+    mock_user.id = 1
+    mock_get_or_create_user.return_value = mock_user
 
     # Set up the mock database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-    mock_session.query.return_value.filter.return_value.first.return_value = None
 
-    # Set up mock scrape result
-    mock_scrape.return_value = {
-        "title": "Test Product",
-        "price": "$100.00",
-        "price_float": 100.0,
-    }
+    # Set up mock handle_track_command result
+    mock_handle_track.return_value = "Now tracking: Test Product"
 
     # Make the function exit after one iteration
     mock_sleep.side_effect = Exception("Stop the loop")
@@ -345,11 +351,8 @@ def test_listen_to_group_track_command(
 
     # Verify the function calls
     mock_run.assert_called_once()
-    mock_parse_message.assert_called_once_with(
-        "test-group-id: !track https://example.com/product 90.00"
-    )
-    mock_scrape.assert_called_once_with("https://example.com/product")
-    mock_session.add.assert_called_once()
-    mock_session.commit.assert_called_once()
-    mock_send_message.assert_called_once()
+    mock_parse_signal_json.assert_called_once()
+    mock_get_or_create_user.assert_called_once_with(mock_session, "+1234567890", "Test User")
+    mock_handle_track.assert_called_once_with("https://example.com/product", 90.0, 1)
+    mock_send_message.assert_called_once_with("test-group-id", "Now tracking: Test Product")
     mock_sleep.assert_called_once()
