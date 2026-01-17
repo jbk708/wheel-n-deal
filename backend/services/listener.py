@@ -29,13 +29,10 @@ def parse_message(message: str) -> dict:
     """
     logger.debug("Parsing message: %s", message)
 
-    # Check for ! prefix - ignore messages without it
     stripped = message.strip()
     if not stripped.startswith("!"):
         return {"command": "ignore"}
 
-    # Command must immediately follow ! (no space between ! and command)
-    # e.g., "!track url" is valid, "! track url" is not
     command_text = stripped[1:]
     if not command_text or command_text[0].isspace():
         return {"command": "ignore"}
@@ -58,19 +55,16 @@ def parse_message(message: str) -> dict:
         logger.info("Parsed !track command: URL=%s, target_price=%s", url, target_price)
         return {"command": "track", "url": url, "target_price": target_price}
 
-    elif command_lower == "status":
-        logger.info("Parsed !status command")
+    if command_lower == "status":
         return {"command": "status"}
 
-    elif command_lower == "help":
-        logger.info("Parsed !help command")
+    if command_lower == "help":
         return {"command": "help"}
 
-    elif command_lower == "list":
-        logger.info("Parsed !list command")
+    if command_lower == "list":
         return {"command": "list"}
 
-    elif command_lower.startswith("stop"):
+    if command_lower.startswith("stop"):
         number_match = re.search(r"^stop\s+(\d+)$", command_lower)
         if number_match:
             number = int(number_match.group(1))
@@ -82,17 +76,15 @@ def parse_message(message: str) -> dict:
             "message": "Invalid !stop command. Use '!stop <number>'.",
         }
 
-    else:
-        logger.warning("Unknown command: %s", command_text)
-        return {
-            "command": "invalid",
-            "message": "Unknown command. Type '!help' for available commands.",
-        }
+    logger.warning("Unknown command: %s", command_text)
+    return {
+        "command": "invalid",
+        "message": "Unknown command. Type '!help' for available commands.",
+    }
 
 
 def handle_help_message() -> str:
     """Generate a help message with available commands."""
-    logger.debug("Generating help message")
     return (
         "Available commands:\n"
         "- !track <url> [target_price] - Track a product URL with optional target price\n"
@@ -122,11 +114,18 @@ def handle_list_tracked_items(user_id: int) -> str:
                 .order_by(PriceHistory.timestamp.desc())
                 .first()
             )
-            current_price = latest_price.price if latest_price else "Unknown"
+
+            if latest_price:
+                current_price = f"${latest_price.price}"
+                last_updated = latest_price.timestamp.strftime("%b %d, %I:%M %p")
+            else:
+                current_price = "Unknown"
+                last_updated = "Never"
 
             message += f"{i}. {product.title}\n"
-            message += f"   Current price: ${current_price}\n"
+            message += f"   Current price: {current_price}\n"
             message += f"   Target price: ${product.target_price}\n"
+            message += f"   Last updated: {last_updated}\n"
             message += f"   URL: {product.url}\n\n"
 
         logger.debug("Generated list of %d tracked products for user_id=%s", len(products), user_id)
@@ -206,7 +205,15 @@ def handle_track_command(url: str, target_price: float | None, user_id: int) -> 
             user_id=user_id,
         )
         db.add(db_product)
+        db.flush()  # Get the product ID before committing
+
+        # Store initial price in history
+        if current_price:
+            initial_price = PriceHistory(product_id=db_product.id, price=current_price)
+            db.add(initial_price)
+
         db.commit()
+        TRACKED_PRODUCTS.inc()
 
         return (
             f"Now tracking: {product_info.get('title', url)}\n"
@@ -218,6 +225,30 @@ def handle_track_command(url: str, target_price: float | None, user_id: int) -> 
         return f"Failed to track product: {e!s}"
     finally:
         db.close()
+
+
+def _get_command_response(cmd: str, parsed_command: dict, user_id: int) -> str:
+    """Get the response message for a parsed command."""
+    if cmd == "track":
+        return handle_track_command(parsed_command["url"], parsed_command["target_price"], user_id)
+
+    if cmd == "status":
+        return "Bot is running and tracking products!"
+
+    if cmd == "list":
+        return handle_list_tracked_items(user_id)
+
+    if cmd == "stop":
+        return stop_tracking_item(parsed_command["number"] - 1, user_id)
+
+    if cmd == "help":
+        return handle_help_message()
+
+    if cmd == "invalid":
+        logger.warning("Invalid command: %s", parsed_command["message"])
+        return parsed_command["message"]
+
+    return "Unknown command. Type '!help' for available commands."
 
 
 def send_response(group_id: str | None, sender_phone: str, message: str) -> None:
@@ -294,45 +325,9 @@ def listen_for_messages() -> None:
 
                 logger.debug("Processing command '%s' for user_id=%s", cmd, user_id)
 
-                # Determine where to send the response
                 response_group_id = signal_msg.group_id if is_group_message else None
-
-                if cmd == "track":
-                    response = handle_track_command(
-                        parsed_command["url"], parsed_command["target_price"], user_id
-                    )
-                    send_response(response_group_id, signal_msg.sender_phone, response)
-
-                elif cmd == "status":
-                    logger.info("Sending status message")
-                    send_response(
-                        response_group_id,
-                        signal_msg.sender_phone,
-                        "Bot is running and tracking products!",
-                    )
-
-                elif cmd == "list":
-                    logger.info("Sending list of tracked items")
-                    send_response(
-                        response_group_id,
-                        signal_msg.sender_phone,
-                        handle_list_tracked_items(user_id),
-                    )
-
-                elif cmd == "stop":
-                    logger.info("Stopping tracking for item %s", parsed_command["number"])
-                    stop_message = stop_tracking_item(parsed_command["number"] - 1, user_id)
-                    send_response(response_group_id, signal_msg.sender_phone, stop_message)
-
-                elif cmd == "help":
-                    logger.info("Sending help message")
-                    send_response(response_group_id, signal_msg.sender_phone, handle_help_message())
-
-                elif cmd == "invalid":
-                    logger.warning("Invalid command: %s", parsed_command["message"])
-                    send_response(
-                        response_group_id, signal_msg.sender_phone, parsed_command["message"]
-                    )
+                response = _get_command_response(cmd, parsed_command, user_id)
+                send_response(response_group_id, signal_msg.sender_phone, response)
 
         except Exception as e:
             logger.error("Error while listening for Signal messages: %s", e, exc_info=True)
