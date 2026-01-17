@@ -140,9 +140,10 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
         id=2, title="Test Product 2", url="https://example.com/product2", target_price=80.0
     )
 
-    from datetime import UTC, datetime
+    from datetime import datetime
 
-    mock_timestamp = datetime(2026, 1, 16, 14, 30, 0, tzinfo=UTC)
+    # Database stores naive UTC timestamps (no tzinfo)
+    mock_timestamp = datetime(2026, 1, 16, 22, 30, 0)  # 22:30 UTC = 2:30 PM Pacific
     mock_price_history1 = MagicMock(price=100.0, timestamp=mock_timestamp)
     mock_price_history2 = MagicMock(price=95.0, timestamp=mock_timestamp)
 

@@ -1,6 +1,7 @@
 import re
 import subprocess
 import time
+from datetime import UTC
 from zoneinfo import ZoneInfo
 
 from config import settings
@@ -118,7 +119,9 @@ def handle_list_tracked_items(user_id: int) -> str:
 
             if latest_price:
                 current_price = f"${latest_price.price}"
-                pacific_time = latest_price.timestamp.astimezone(ZoneInfo("America/Los_Angeles"))
+                # Database stores naive UTC timestamps, so make it timezone-aware first
+                utc_time = latest_price.timestamp.replace(tzinfo=UTC)
+                pacific_time = utc_time.astimezone(ZoneInfo("America/Los_Angeles"))
                 last_updated = pacific_time.strftime("%b %d, %I:%M %p")
             else:
                 current_price = "Unknown"
