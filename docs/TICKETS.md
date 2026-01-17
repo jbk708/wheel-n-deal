@@ -4,11 +4,13 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-047 | Add scrapers for Sephora, DedCool, Costco and improve generic fallback | In Progress | feat-WND-047-new-site-scrapers |
 
 ## Backlog
 
 | Ticket | Description | Priority |
 |--------|-------------|----------|
+| WND-048 | Add proper Sephora price scraping (prices load dynamically via JS) | High |
 | **Phase 3: React Web Interface** | | |
 | WND-033 | Initialize React frontend with Vite, TailwindCSS, React Router | Medium |
 | WND-034 | Auth pages - login, register, password reset | Medium |
