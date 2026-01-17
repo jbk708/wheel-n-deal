@@ -10,6 +10,7 @@
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
+| WND-046 | Store initial price when tracking product and show last updated timestamp | High |
 | WND-032 | Add !me command to show user's Signal identity/stats | Medium |
 | **Phase 3: React Web Interface** | | |
 | WND-033 | Initialize React frontend with Vite, TailwindCSS, React Router | Medium |
