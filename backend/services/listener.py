@@ -1,117 +1,162 @@
 import re
 import subprocess
 import time
+from datetime import UTC
+from zoneinfo import ZoneInfo
 
 from config import settings
-from models import PriceHistory, get_db_session
+from models import PriceHistory, User, get_db_session
 from models import Product as DBProduct
-from services.notification import send_signal_message_to_group
+from services.notification import send_signal_message_to_group, send_signal_message_to_user
 from services.scraper import scrape_product_info
+from services.signal_parser import parse_signal_json
+from services.user_service import get_or_create_signal_user
 from utils.logging import get_logger
 from utils.monitoring import TRACKED_PRODUCTS
 
 logger = get_logger("listener")
 
 
-def parse_message(message: str):
+def parse_message(message: str) -> dict:
     """
     Parse the incoming message and extract command, URL, and target price if present.
+
+    Commands must start with ! prefix. Messages without prefix are ignored.
     Supported commands:
-    - "track <url> <target_price>" (target_price is optional)
-    - "status"
-    - "help"
-    - "list" (List tracked items)
-    - "stop <number>" (Stop tracking item by number)
+    - "!track <url> [target_price]" (target_price is optional)
+    - "!status"
+    - "!help"
+    - "!list" (List tracked items)
+    - "!stop <number>" (Stop tracking item by number)
+    - "!me" (Show user identity and stats)
     """
-    logger.debug(f"Parsing message: {message}")
+    logger.debug("Parsing message: %s", message)
 
-    if "track" in message.lower():
-        # Extract URL and optional target price using regex
-        url_match = re.search(r"(https?://\S+)", message)
+    stripped = message.strip()
+    if not stripped.startswith("!"):
+        return {"command": "ignore"}
 
-        if url_match:
-            url = url_match.group(0)
-            # Look for target price AFTER the URL - must be a standalone number
-            # Only match price if explicitly provided (e.g., "track <url> 15.99")
-            after_url = message[url_match.end() :]
-            # Match a price that's clearly separate: whitespace + number (with optional decimals)
-            price_match = re.search(r"^\s+(\d+(?:\.\d{1,2})?)\s*$", after_url)
-            target_price = float(price_match.group(1)) if price_match else None
-            logger.info(f"Parsed track command: URL={url}, target_price={target_price}")
-            return {"command": "track", "url": url, "target_price": target_price}
-        else:
-            logger.warning("Invalid URL format in track command")
+    command_text = stripped[1:]
+    if not command_text or command_text[0].isspace():
+        return {"command": "ignore"}
+
+    command_lower = command_text.lower()
+
+    if command_lower.startswith("track"):
+        url_match = re.search(r"(https?://\S+)", command_text)
+        if not url_match:
+            logger.warning("Invalid URL format in !track command")
             return {
                 "command": "invalid",
-                "message": "Invalid URL format. Use 'track <url> <target_price>'.",
+                "message": "Invalid URL format. Use '!track <url> [target_price]'.",
             }
 
-    elif "status" in message.lower():
-        logger.info("Parsed status command")
+        url = url_match.group(0)
+        after_url = command_text[url_match.end() :]
+        price_match = re.search(r"^\s+(\d+(?:\.\d{1,2})?)\s*$", after_url)
+        target_price = float(price_match.group(1)) if price_match else None
+        logger.info("Parsed !track command: URL=%s, target_price=%s", url, target_price)
+        return {"command": "track", "url": url, "target_price": target_price}
+
+    if command_lower == "status":
         return {"command": "status"}
 
-    elif "help" in message.lower():
-        logger.info("Parsed help command")
+    if command_lower == "help":
         return {"command": "help"}
 
-    elif "list" in message.lower():
-        logger.info("Parsed list command")
+    if command_lower == "list":
         return {"command": "list"}
 
-    elif "stop" in message.lower():
-        # Extract the number after "stop"
-        number_match = re.search(r"stop\s+(\d+)", message.lower())
-        if number_match:
-            try:
-                number = int(number_match.group(1))
-                logger.info(f"Parsed stop command: number={number}")
-                return {"command": "stop", "number": number}
-            except ValueError:
-                logger.warning("Invalid number format in stop command")
-                return {
-                    "command": "invalid",
-                    "message": "Invalid number format. Use 'stop <number>'.",
-                }
-        else:
-            logger.warning("Invalid stop command format")
-            return {
-                "command": "invalid",
-                "message": "Invalid stop command. Use 'stop <number>'.",
-            }
+    if command_lower == "me":
+        return {"command": "me"}
 
-    else:
-        logger.warning(f"Unknown command: {message}")
+    if command_lower.startswith("stop"):
+        number_match = re.search(r"^stop\s+(\d+)$", command_lower)
+        if number_match:
+            number = int(number_match.group(1))
+            logger.info("Parsed !stop command: number=%s", number)
+            return {"command": "stop", "number": number}
+        logger.warning("Invalid !stop command format")
         return {
             "command": "invalid",
-            "message": "Unknown command. Type 'help' for available commands.",
+            "message": "Invalid !stop command. Use '!stop <number>'.",
         }
+
+    logger.warning("Unknown command: %s", command_text)
+    return {
+        "command": "invalid",
+        "message": "Unknown command. Type '!help' for available commands.",
+    }
 
 
 def handle_help_message() -> str:
     """Generate a help message with available commands."""
-    logger.debug("Generating help message")
-    return """
-Available commands:
-- track <url> [target_price] - Track a product URL with optional target price
-- status - Check if the bot is running
-- list - List all tracked products
-- stop <number> - Stop tracking a product by its number in the list
-- help - Show this help message
-    """
+    return (
+        "Available commands:\n"
+        "- !track <url> [target_price] - Track a product URL with optional target price\n"
+        "- !status - Check if the bot is running\n"
+        "- !list - List all tracked products\n"
+        "- !stop <number> - Stop tracking a product by its number in the list\n"
+        "- !me - Show your account info and stats\n"
+        "- !help - Show this help message"
+    )
 
 
-def handle_list_tracked_items() -> str:
-    """Generate a message with all tracked items."""
-    logger.info("Handling list tracked items command")
+def handle_me_command(user_id: int) -> str:
+    """Generate a message with the user's identity and stats."""
+    logger.info("Handling me command for user_id=%s", user_id)
     db = get_db_session()
     try:
-        products = db.query(DBProduct).all()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return "Could not find your user record."
+
+        # Display name: prefer username, fall back to masked phone
+        if user.signal_username:
+            display_name = user.signal_username
+        elif user.signal_phone:
+            # Mask phone: show first 3 and last 4 digits
+            phone = user.signal_phone
+            display_name = f"{phone[:3]}***{phone[-4:]}" if len(phone) > 7 else phone
+        else:
+            display_name = "Unknown"
+
+        # Member since date in Pacific time
+        if user.created_at:
+            utc_time = user.created_at.replace(tzinfo=UTC)
+            pacific_time = utc_time.astimezone(ZoneInfo("America/Los_Angeles"))
+            member_since = pacific_time.strftime("%b %d, %Y")
+        else:
+            member_since = "Unknown"
+
+        # Count tracked products
+        product_count = db.query(DBProduct).filter(DBProduct.user_id == user_id).count()
+
+        message = "Your account info:\n"
+        message += f"Name: {display_name}\n"
+        message += f"Member since: {member_since}\n"
+        message += f"Products tracked: {product_count}"
+
+        return message
+    except Exception as e:
+        logger.error("Error retrieving user info: %s", e, exc_info=True)
+        return f"Error retrieving user info: {e!s}"
+    finally:
+        db.close()
+
+
+def handle_list_tracked_items(user_id: int) -> str:
+    """Generate a message with the user's tracked items."""
+    logger.info("Handling list tracked items command for user_id=%s", user_id)
+    db = get_db_session()
+    try:
+        products = db.query(DBProduct).filter(DBProduct.user_id == user_id).all()
 
         if not products:
-            logger.info("No products are currently being tracked")
-            return "No products are currently being tracked."
+            logger.info("No products are currently being tracked for user_id=%s", user_id)
+            return "You're not tracking any products yet. Use !track <url> to start."
 
-        message = "Currently tracked products:\n"
+        message = "Your tracked products:\n"
         for i, product in enumerate(products, 1):
             latest_price = (
                 db.query(PriceHistory)
@@ -119,31 +164,46 @@ def handle_list_tracked_items() -> str:
                 .order_by(PriceHistory.timestamp.desc())
                 .first()
             )
-            current_price = latest_price.price if latest_price else "Unknown"
+
+            if latest_price:
+                current_price = f"${latest_price.price}"
+                # Database stores naive UTC timestamps, so make it timezone-aware first
+                utc_time = latest_price.timestamp.replace(tzinfo=UTC)
+                pacific_time = utc_time.astimezone(ZoneInfo("America/Los_Angeles"))
+                last_updated = pacific_time.strftime("%b %d, %I:%M %p")
+            else:
+                current_price = "Unknown"
+                last_updated = "Never"
 
             message += f"{i}. {product.title}\n"
-            message += f"   Current price: ${current_price}\n"
+            message += f"   Current price: {current_price}\n"
             message += f"   Target price: ${product.target_price}\n"
+            message += f"   Last updated: {last_updated}\n"
             message += f"   URL: {product.url}\n\n"
 
-        logger.debug(f"Generated list of {len(products)} tracked products")
+        logger.debug("Generated list of %d tracked products for user_id=%s", len(products), user_id)
         return message
     except Exception as e:
-        logger.error(f"Error retrieving tracked products: {e!s}", exc_info=True)
+        logger.error("Error retrieving tracked products: %s", e, exc_info=True)
         return f"Error retrieving tracked products: {e!s}"
     finally:
         db.close()
 
 
-def stop_tracking_item(index: int) -> str:
-    """Stop tracking the item by its index in the tracked products list."""
-    logger.info(f"Handling stop tracking command for item at index {index}")
+def stop_tracking_item(index: int, user_id: int) -> str:
+    """Stop tracking the item by its index in the user's tracked products list."""
+    logger.info("Handling stop tracking command for item %d, user_id=%s", index, user_id)
     db = get_db_session()
     try:
-        products = db.query(DBProduct).all()
+        products = db.query(DBProduct).filter(DBProduct.user_id == user_id).all()
 
-        if not (0 <= index < len(products)):
-            logger.warning(f"Invalid product index: {index}, valid range is 0-{len(products) - 1}")
+        if not products:
+            return "You're not tracking any products yet."
+
+        if index < 0 or index >= len(products):
+            logger.warning(
+                "Invalid product index: %d, valid range is 0-%d", index, len(products) - 1
+            )
             return f"Invalid number. Please provide a number between 1 and {len(products)}."
 
         product_to_delete = products[index]
@@ -151,66 +211,116 @@ def stop_tracking_item(index: int) -> str:
         db.commit()
         TRACKED_PRODUCTS.dec()
 
-        logger.info(f"Stopped tracking product: {product_to_delete.title}")
+        logger.info("Stopped tracking product: %s", product_to_delete.title)
         return f"Stopped tracking: {product_to_delete.title}."
     except Exception as e:
         db.rollback()
-        logger.error(f"Error stopping tracking: {e!s}", exc_info=True)
+        logger.error("Error stopping tracking: %s", e, exc_info=True)
         return f"Error stopping tracking: {e!s}"
     finally:
         db.close()
 
 
-def handle_track_command(url: str, target_price: float | None) -> str:
+def handle_track_command(url: str, target_price: float | None, user_id: int) -> str:
     """
     Track a product by URL, scraping its info and storing in the database.
 
-    Returns a message indicating success or failure.
+    Args:
+        url: The product URL to track.
+        target_price: Optional target price for alerts.
+        user_id: The user ID to associate with this product.
+
+    Returns:
+        A message indicating success or failure.
     """
-    logger.info(f"Tracking product: {url}")
+    logger.info("Tracking product: %s for user_id=%s", url, user_id)
     db = get_db_session()
     try:
-        existing = db.query(DBProduct).filter(DBProduct.url == url).first()
+        # Check if this user is already tracking this URL
+        existing = (
+            db.query(DBProduct).filter(DBProduct.url == url, DBProduct.user_id == user_id).first()
+        )
         if existing:
-            return f"Product is already being tracked: {url}"
+            return "You're already tracking this product."
 
         product_info = scrape_product_info(url)
         if not product_info:
             return f"Failed to scrape product info for: {url}"
 
         current_price = product_info.get("price_float")
-        final_target_price = target_price
-
-        if final_target_price is None and current_price:
-            final_target_price = round(current_price * 0.9, 2)
+        if target_price is None and current_price:
+            target_price = round(current_price * 0.9, 2)
 
         db_product = DBProduct(
             url=url,
             title=product_info.get("title", "Unknown"),
-            target_price=final_target_price or 0,
-            user_id=1,  # Default user for Signal tracking
+            target_price=target_price or 0,
+            user_id=user_id,
         )
         db.add(db_product)
+        db.flush()  # Get the product ID before committing
+
+        # Store initial price in history
+        if current_price:
+            initial_price = PriceHistory(product_id=db_product.id, price=current_price)
+            db.add(initial_price)
+
         db.commit()
+        TRACKED_PRODUCTS.inc()
 
         return (
             f"Now tracking: {product_info.get('title', url)}\n"
             f"Current price: ${current_price:.2f}\n"
-            f"Target price: ${final_target_price:.2f}"
+            f"Target price: ${target_price:.2f}"
         )
     except Exception as e:
-        logger.error(f"Failed to track product: {e!s}")
+        logger.error("Failed to track product: %s", e)
         return f"Failed to track product: {e!s}"
     finally:
         db.close()
 
 
-def listen_to_group() -> None:
-    """Listen to the Signal group for incoming messages and respond to commands."""
-    group_id = settings.SIGNAL_GROUP_ID
-    command = ["signal-cli", "-u", settings.SIGNAL_PHONE_NUMBER, "receive"]
+def _get_command_response(cmd: str, parsed_command: dict, user_id: int) -> str:
+    """Get the response message for a parsed command."""
+    if cmd == "track":
+        return handle_track_command(parsed_command["url"], parsed_command["target_price"], user_id)
 
-    logger.info(f"Starting Signal listener for group {group_id[:8]}...")
+    if cmd == "status":
+        return "Bot is running and tracking products!"
+
+    if cmd == "list":
+        return handle_list_tracked_items(user_id)
+
+    if cmd == "stop":
+        return stop_tracking_item(parsed_command["number"] - 1, user_id)
+
+    if cmd == "help":
+        return handle_help_message()
+
+    if cmd == "me":
+        return handle_me_command(user_id)
+
+    if cmd == "invalid":
+        logger.warning("Invalid command: %s", parsed_command["message"])
+        return parsed_command["message"]
+
+    return "Unknown command. Type '!help' for available commands."
+
+
+def send_response(group_id: str | None, sender_phone: str, message: str) -> None:
+    """Send a response to the appropriate destination (group or direct message)."""
+    if group_id:
+        send_signal_message_to_group(group_id, message)
+    else:
+        send_signal_message_to_user(sender_phone, message)
+
+
+def listen_for_messages() -> None:
+    """Listen for Signal messages (both group and direct) and respond to commands."""
+    group_id = settings.SIGNAL_GROUP_ID
+    command = ["signal-cli", "-u", settings.SIGNAL_PHONE_NUMBER, "--output=json", "receive"]
+
+    logger.info("Starting Signal listener (group: %s, direct messages: enabled)...", group_id[:8])
 
     while True:
         try:
@@ -219,49 +329,70 @@ def listen_to_group() -> None:
 
             if result.returncode != 0:
                 error_message = result.stderr.decode("utf-8")
-                logger.error(f"Failed to receive messages: {error_message}")
+                logger.error("Failed to receive messages: %s", error_message)
                 time.sleep(5)
                 continue
 
             output = result.stdout.decode("utf-8")
-            if group_id not in output:
+            if not output.strip():
                 time.sleep(5)
                 continue
 
-            logger.info(f"Message received from group: {output[:100]}...")
-            message = output.lower()
-            parsed_command = parse_message(message)
-            cmd = parsed_command["command"]
+            # Parse JSON output to get messages with sender info
+            messages = parse_signal_json(output)
+            if not messages:
+                time.sleep(5)
+                continue
 
-            if cmd == "track":
-                response = handle_track_command(
-                    parsed_command["url"], parsed_command["target_price"]
+            for signal_msg in messages:
+                # Process messages from our group OR direct messages (no group_id)
+                is_group_message = signal_msg.group_id == group_id
+                is_direct_message = signal_msg.group_id is None
+
+                if not is_group_message and not is_direct_message:
+                    # Message from a different group - ignore
+                    continue
+
+                msg_type = "group" if is_group_message else "direct"
+                logger.info(
+                    "[%s] Message from %s (%s): %s",
+                    msg_type,
+                    signal_msg.sender_name or "Unknown",
+                    signal_msg.sender_phone,
+                    signal_msg.message[:50],
                 )
-                send_signal_message_to_group(group_id, response)
 
-            elif cmd == "status":
-                logger.info("Sending status message")
-                send_signal_message_to_group(group_id, "Bot is running and tracking products!")
+                # Parse the command
+                parsed_command = parse_message(signal_msg.message)
+                cmd = parsed_command["command"]
 
-            elif cmd == "list":
-                logger.info("Sending list of tracked items")
-                send_signal_message_to_group(group_id, handle_list_tracked_items())
+                if cmd == "ignore":
+                    continue
 
-            elif cmd == "stop":
-                logger.info(f"Stopping tracking for item {parsed_command['number']}")
-                stop_message = stop_tracking_item(parsed_command["number"] - 1)
-                send_signal_message_to_group(group_id, stop_message)
+                # Get or create user for this sender
+                db = get_db_session()
+                try:
+                    user = get_or_create_signal_user(
+                        db, signal_msg.sender_phone, signal_msg.sender_name
+                    )
+                    user_id: int = user.id  # type: ignore[assignment]
+                finally:
+                    db.close()
 
-            elif cmd == "help":
-                logger.info("Sending help message")
-                send_signal_message_to_group(group_id, handle_help_message())
+                logger.debug("Processing command '%s' for user_id=%s", cmd, user_id)
 
-            else:
-                logger.warning(f"Invalid command: {parsed_command['message']}")
-                send_signal_message_to_group(group_id, parsed_command["message"])
+                response_group_id = signal_msg.group_id if is_group_message else None
+                response = _get_command_response(cmd, parsed_command, user_id)
+                send_response(response_group_id, signal_msg.sender_phone, response)
 
         except Exception as e:
-            logger.error(f"Error while listening to Signal group: {e!s}", exc_info=True)
+            logger.error("Error while listening for Signal messages: %s", e, exc_info=True)
 
         logger.debug("Sleeping for 5 seconds before checking for new messages...")
         time.sleep(5)
+
+
+# Backward compatibility alias
+def listen_to_group() -> None:
+    """Listen for Signal messages. Alias for listen_for_messages()."""
+    listen_for_messages()
