@@ -5,7 +5,7 @@ import time
 from config import settings
 from models import PriceHistory, get_db_session
 from models import Product as DBProduct
-from services.notification import send_signal_message_to_group
+from services.notification import send_signal_message_to_group, send_signal_message_to_user
 from services.scraper import scrape_product_info
 from services.signal_parser import parse_signal_json
 from services.user_service import get_or_create_signal_user
@@ -15,7 +15,7 @@ from utils.monitoring import TRACKED_PRODUCTS
 logger = get_logger("listener")
 
 
-def parse_message(message: str):
+def parse_message(message: str) -> dict:
     """
     Parse the incoming message and extract command, URL, and target price if present.
 
@@ -71,18 +71,16 @@ def parse_message(message: str):
         return {"command": "list"}
 
     elif command_lower.startswith("stop"):
-        # Extract the number after "stop"
         number_match = re.search(r"^stop\s+(\d+)$", command_lower)
         if number_match:
             number = int(number_match.group(1))
             logger.info("Parsed !stop command: number=%s", number)
             return {"command": "stop", "number": number}
-        else:
-            logger.warning("Invalid !stop command format")
-            return {
-                "command": "invalid",
-                "message": "Invalid !stop command. Use '!stop <number>'.",
-            }
+        logger.warning("Invalid !stop command format")
+        return {
+            "command": "invalid",
+            "message": "Invalid !stop command. Use '!stop <number>'.",
+        }
 
     else:
         logger.warning("Unknown command: %s", command_text)
@@ -222,12 +220,20 @@ def handle_track_command(url: str, target_price: float | None, user_id: int) -> 
         db.close()
 
 
-def listen_to_group() -> None:
-    """Listen to the Signal group for incoming messages and respond to commands."""
+def send_response(group_id: str | None, sender_phone: str, message: str) -> None:
+    """Send a response to the appropriate destination (group or direct message)."""
+    if group_id:
+        send_signal_message_to_group(group_id, message)
+    else:
+        send_signal_message_to_user(sender_phone, message)
+
+
+def listen_for_messages() -> None:
+    """Listen for Signal messages (both group and direct) and respond to commands."""
     group_id = settings.SIGNAL_GROUP_ID
     command = ["signal-cli", "-u", settings.SIGNAL_PHONE_NUMBER, "--output=json", "receive"]
 
-    logger.info("Starting Signal listener for group %s...", group_id[:8])
+    logger.info("Starting Signal listener (group: %s, direct messages: enabled)...", group_id[:8])
 
     while True:
         try:
@@ -252,12 +258,18 @@ def listen_to_group() -> None:
                 continue
 
             for signal_msg in messages:
-                # Only process messages from our group
-                if signal_msg.group_id != group_id:
+                # Process messages from our group OR direct messages (no group_id)
+                is_group_message = signal_msg.group_id == group_id
+                is_direct_message = signal_msg.group_id is None
+
+                if not is_group_message and not is_direct_message:
+                    # Message from a different group - ignore
                     continue
 
+                msg_type = "group" if is_group_message else "direct"
                 logger.info(
-                    "Message from %s (%s): %s",
+                    "[%s] Message from %s (%s): %s",
+                    msg_type,
                     signal_msg.sender_name or "Unknown",
                     signal_msg.sender_phone,
                     signal_msg.message[:50],
@@ -282,35 +294,54 @@ def listen_to_group() -> None:
 
                 logger.debug("Processing command '%s' for user_id=%s", cmd, user_id)
 
+                # Determine where to send the response
+                response_group_id = signal_msg.group_id if is_group_message else None
+
                 if cmd == "track":
                     response = handle_track_command(
                         parsed_command["url"], parsed_command["target_price"], user_id
                     )
-                    send_signal_message_to_group(group_id, response)
+                    send_response(response_group_id, signal_msg.sender_phone, response)
 
                 elif cmd == "status":
                     logger.info("Sending status message")
-                    send_signal_message_to_group(group_id, "Bot is running and tracking products!")
+                    send_response(
+                        response_group_id,
+                        signal_msg.sender_phone,
+                        "Bot is running and tracking products!",
+                    )
 
                 elif cmd == "list":
                     logger.info("Sending list of tracked items")
-                    send_signal_message_to_group(group_id, handle_list_tracked_items(user_id))
+                    send_response(
+                        response_group_id,
+                        signal_msg.sender_phone,
+                        handle_list_tracked_items(user_id),
+                    )
 
                 elif cmd == "stop":
                     logger.info("Stopping tracking for item %s", parsed_command["number"])
                     stop_message = stop_tracking_item(parsed_command["number"] - 1, user_id)
-                    send_signal_message_to_group(group_id, stop_message)
+                    send_response(response_group_id, signal_msg.sender_phone, stop_message)
 
                 elif cmd == "help":
                     logger.info("Sending help message")
-                    send_signal_message_to_group(group_id, handle_help_message())
+                    send_response(response_group_id, signal_msg.sender_phone, handle_help_message())
 
                 elif cmd == "invalid":
                     logger.warning("Invalid command: %s", parsed_command["message"])
-                    send_signal_message_to_group(group_id, parsed_command["message"])
+                    send_response(
+                        response_group_id, signal_msg.sender_phone, parsed_command["message"]
+                    )
 
         except Exception as e:
-            logger.error("Error while listening to Signal group: %s", e, exc_info=True)
+            logger.error("Error while listening for Signal messages: %s", e, exc_info=True)
 
         logger.debug("Sleeping for 5 seconds before checking for new messages...")
         time.sleep(5)
+
+
+# Backward compatibility alias
+def listen_to_group() -> None:
+    """Listen for Signal messages. Alias for listen_for_messages()."""
+    listen_for_messages()
