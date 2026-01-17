@@ -4,6 +4,7 @@
 
 | Ticket | Description | Status | Branch |
 |--------|-------------|--------|--------|
+| WND-047 | Add scrapers for Sephora, DedCool, Costco and improve generic fallback | In Progress | feat-WND-047-new-site-scrapers |
 
 ## Backlog
 
