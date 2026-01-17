@@ -10,7 +10,6 @@
 | Ticket | Description | Priority |
 |--------|-------------|----------|
 | **Phase 2: Command Prefix & Per-User Tracking** | | |
-| WND-046 | Store initial price when tracking product and show last updated timestamp | High |
 | WND-032 | Add !me command to show user's Signal identity/stats | Medium |
 | **Phase 3: React Web Interface** | | |
 | WND-033 | Initialize React frontend with Vite, TailwindCSS, React Router | Medium |
@@ -31,6 +30,7 @@
 
 | Ticket | Description | Completed | PR |
 |--------|-------------|-----------|-----|
+| WND-046 | Store initial price when tracking product and show last updated timestamp | 2026-01-16 | #41 |
 | WND-045 | Support direct messages to bot (1:1 chat in addition to group) | 2026-01-16 | #40 |
 | WND-031 | Scope all commands to sender's own product list | 2026-01-16 | #39 |
 | WND-030 | Require `!` prefix for commands (!track, !list, !stop, !help, !status) | 2026-01-16 | #38 |
