@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -139,8 +140,12 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
         id=2, title="Test Product 2", url="https://example.com/product2", target_price=80.0
     )
 
-    mock_price_history1 = MagicMock(price=100.0)
-    mock_price_history2 = MagicMock(price=95.0)
+    from datetime import datetime
+
+    # Database stores naive UTC timestamps (no tzinfo)
+    mock_timestamp = datetime(2026, 1, 16, 22, 30, 0)  # 22:30 UTC = 2:30 PM Pacific
+    mock_price_history1 = MagicMock(price=100.0, timestamp=mock_timestamp)
+    mock_price_history2 = MagicMock(price=95.0, timestamp=mock_timestamp)
 
     mock_product_filter = MagicMock()
     mock_product_filter.all.return_value = [mock_product1, mock_product2]
@@ -167,6 +172,7 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     assert "Test Product 2" in result
     assert "Current price: $100.0" in result
     assert "Target price: $90.0" in result
+    assert "Last updated:" in result
     mock_session.close.assert_called_once()
 
 
@@ -226,10 +232,14 @@ def test_stop_tracking_item_exception(mock_get_db_session):
     mock_session.close.assert_called_once()
 
 
+@dataclass
 class MockSubprocessResult:
-    def __init__(self, returncode: int, stdout_text: str):
-        self.returncode = returncode
-        self.stdout = stdout_text.encode("utf-8")
+    returncode: int
+    stdout: bytes
+
+    @classmethod
+    def success(cls, stdout_text: str) -> "MockSubprocessResult":
+        return cls(returncode=0, stdout=stdout_text.encode("utf-8"))
 
 
 @patch("services.listener.subprocess.run")
@@ -254,7 +264,7 @@ def test_listen_to_group_track_command(
     mock_settings.SIGNAL_GROUP_ID = "test-group-id"
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
 
-    mock_run.return_value = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
+    mock_run.return_value = MockSubprocessResult.success('{"envelope": {"source": "+1234567890"}}')
 
     mock_signal_msg = MagicMock(
         group_id="test-group-id",
@@ -321,7 +331,7 @@ def test_listen_for_messages_direct_message(
     mock_settings.SIGNAL_GROUP_ID = "test-group-id"
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
 
-    mock_run.return_value = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
+    mock_run.return_value = MockSubprocessResult.success('{"envelope": {"source": "+1234567890"}}')
 
     mock_signal_msg = MagicMock(
         group_id=None,
