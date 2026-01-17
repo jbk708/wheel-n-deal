@@ -5,7 +5,7 @@ from datetime import UTC
 from zoneinfo import ZoneInfo
 
 from config import settings
-from models import PriceHistory, get_db_session
+from models import PriceHistory, User, get_db_session
 from models import Product as DBProduct
 from services.notification import send_signal_message_to_group, send_signal_message_to_user
 from services.scraper import scrape_product_info
@@ -28,6 +28,7 @@ def parse_message(message: str) -> dict:
     - "!help"
     - "!list" (List tracked items)
     - "!stop <number>" (Stop tracking item by number)
+    - "!me" (Show user identity and stats)
     """
     logger.debug("Parsing message: %s", message)
 
@@ -66,6 +67,9 @@ def parse_message(message: str) -> dict:
     if command_lower == "list":
         return {"command": "list"}
 
+    if command_lower == "me":
+        return {"command": "me"}
+
     if command_lower.startswith("stop"):
         number_match = re.search(r"^stop\s+(\d+)$", command_lower)
         if number_match:
@@ -93,8 +97,52 @@ def handle_help_message() -> str:
         "- !status - Check if the bot is running\n"
         "- !list - List all tracked products\n"
         "- !stop <number> - Stop tracking a product by its number in the list\n"
+        "- !me - Show your account info and stats\n"
         "- !help - Show this help message"
     )
+
+
+def handle_me_command(user_id: int) -> str:
+    """Generate a message with the user's identity and stats."""
+    logger.info("Handling me command for user_id=%s", user_id)
+    db = get_db_session()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return "Could not find your user record."
+
+        # Display name: prefer username, fall back to masked phone
+        if user.signal_username:
+            display_name = user.signal_username
+        elif user.signal_phone:
+            # Mask phone: show first 3 and last 4 digits
+            phone = user.signal_phone
+            display_name = f"{phone[:3]}***{phone[-4:]}" if len(phone) > 7 else phone
+        else:
+            display_name = "Unknown"
+
+        # Member since date in Pacific time
+        if user.created_at:
+            utc_time = user.created_at.replace(tzinfo=UTC)
+            pacific_time = utc_time.astimezone(ZoneInfo("America/Los_Angeles"))
+            member_since = pacific_time.strftime("%b %d, %Y")
+        else:
+            member_since = "Unknown"
+
+        # Count tracked products
+        product_count = db.query(DBProduct).filter(DBProduct.user_id == user_id).count()
+
+        message = "Your account info:\n"
+        message += f"Name: {display_name}\n"
+        message += f"Member since: {member_since}\n"
+        message += f"Products tracked: {product_count}"
+
+        return message
+    except Exception as e:
+        logger.error("Error retrieving user info: %s", e, exc_info=True)
+        return f"Error retrieving user info: {e!s}"
+    finally:
+        db.close()
 
 
 def handle_list_tracked_items(user_id: int) -> str:
@@ -248,6 +296,9 @@ def _get_command_response(cmd: str, parsed_command: dict, user_id: int) -> str:
 
     if cmd == "help":
         return handle_help_message()
+
+    if cmd == "me":
+        return handle_me_command(user_id)
 
     if cmd == "invalid":
         logger.warning("Invalid command: %s", parsed_command["message"])

@@ -6,6 +6,7 @@ import pytest
 from services.listener import (
     handle_help_message,
     handle_list_tracked_items,
+    handle_me_command,
     listen_for_messages,
     listen_to_group,
     parse_message,
@@ -53,6 +54,11 @@ def test_parse_message_help():
 def test_parse_message_list():
     """Test parsing a !list message."""
     assert parse_message("!list")["command"] == "list"
+
+
+def test_parse_message_me():
+    """Test parsing a !me message."""
+    assert parse_message("!me")["command"] == "me"
 
 
 def test_parse_message_stop_valid():
@@ -111,7 +117,72 @@ def test_handle_help_message():
     assert "!status" in result
     assert "!list" in result
     assert "!stop" in result
+    assert "!me" in result
     assert "!help" in result
+
+
+@patch("services.listener.get_db_session")
+def test_handle_me_command_with_username(mock_get_db_session):
+    """Test !me command with a user that has a username."""
+    from datetime import datetime
+
+    mock_session = MagicMock()
+    mock_get_db_session.return_value = mock_session
+
+    mock_user = MagicMock(
+        id=1,
+        signal_username="TestUser",
+        signal_phone="+1234567890",
+        created_at=datetime(2026, 1, 15, 20, 0, 0),  # UTC
+    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+    mock_session.query.return_value.filter.return_value.count.return_value = 3
+
+    result = handle_me_command(user_id=1)
+
+    assert "Your account info" in result
+    assert "Name: TestUser" in result
+    assert "Member since: Jan 15, 2026" in result
+    assert "Products tracked: 3" in result
+    mock_session.close.assert_called_once()
+
+
+@patch("services.listener.get_db_session")
+def test_handle_me_command_with_masked_phone(mock_get_db_session):
+    """Test !me command with a user that has only a phone number."""
+    from datetime import datetime
+
+    mock_session = MagicMock()
+    mock_get_db_session.return_value = mock_session
+
+    mock_user = MagicMock(
+        id=1,
+        signal_username=None,
+        signal_phone="+1234567890",
+        created_at=datetime(2026, 1, 10, 12, 0, 0),
+    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_user
+    mock_session.query.return_value.filter.return_value.count.return_value = 0
+
+    result = handle_me_command(user_id=1)
+
+    assert "Your account info" in result
+    assert "Name: +12***7890" in result
+    assert "Products tracked: 0" in result
+    mock_session.close.assert_called_once()
+
+
+@patch("services.listener.get_db_session")
+def test_handle_me_command_user_not_found(mock_get_db_session):
+    """Test !me command when user is not found."""
+    mock_session = MagicMock()
+    mock_get_db_session.return_value = mock_session
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    result = handle_me_command(user_id=999)
+
+    assert "Could not find your user record" in result
+    mock_session.close.assert_called_once()
 
 
 @patch("services.listener.get_db_session")
