@@ -5,16 +5,17 @@ import pytest
 from services.listener import (
     handle_help_message,
     handle_list_tracked_items,
+    listen_for_messages,
     listen_to_group,
     parse_message,
+    send_response,
     stop_tracking_item,
 )
 
 
 def test_parse_message_track_with_url_and_price():
     """Test parsing a !track message with URL and price."""
-    message = "!track https://example.com/product 90.00"
-    result = parse_message(message)
+    result = parse_message("!track https://example.com/product 90.00")
 
     assert result["command"] == "track"
     assert result["url"] == "https://example.com/product"
@@ -23,8 +24,7 @@ def test_parse_message_track_with_url_and_price():
 
 def test_parse_message_track_with_url_only():
     """Test parsing a !track message with URL only."""
-    message = "!track https://example.com/product"
-    result = parse_message(message)
+    result = parse_message("!track https://example.com/product")
 
     assert result["command"] == "track"
     assert result["url"] == "https://example.com/product"
@@ -33,8 +33,7 @@ def test_parse_message_track_with_url_only():
 
 def test_parse_message_track_invalid_url():
     """Test parsing a !track message with invalid URL."""
-    message = "!track invalid-url"
-    result = parse_message(message)
+    result = parse_message("!track invalid-url")
 
     assert result["command"] == "invalid"
     assert "Invalid URL format" in result["message"]
@@ -42,32 +41,22 @@ def test_parse_message_track_invalid_url():
 
 def test_parse_message_status():
     """Test parsing a !status message."""
-    message = "!status"
-    result = parse_message(message)
-
-    assert result["command"] == "status"
+    assert parse_message("!status")["command"] == "status"
 
 
 def test_parse_message_help():
     """Test parsing a !help message."""
-    message = "!help"
-    result = parse_message(message)
-
-    assert result["command"] == "help"
+    assert parse_message("!help")["command"] == "help"
 
 
 def test_parse_message_list():
     """Test parsing a !list message."""
-    message = "!list"
-    result = parse_message(message)
-
-    assert result["command"] == "list"
+    assert parse_message("!list")["command"] == "list"
 
 
 def test_parse_message_stop_valid():
     """Test parsing a valid !stop message."""
-    message = "!stop 1"
-    result = parse_message(message)
+    result = parse_message("!stop 1")
 
     assert result["command"] == "stop"
     assert result["number"] == 1
@@ -75,8 +64,7 @@ def test_parse_message_stop_valid():
 
 def test_parse_message_stop_invalid_format():
     """Test parsing an invalid !stop message (no number)."""
-    message = "!stop"
-    result = parse_message(message)
+    result = parse_message("!stop")
 
     assert result["command"] == "invalid"
     assert "Invalid !stop command" in result["message"]
@@ -84,8 +72,7 @@ def test_parse_message_stop_invalid_format():
 
 def test_parse_message_unknown_command():
     """Test parsing an unknown ! command."""
-    message = "!unknown"
-    result = parse_message(message)
+    result = parse_message("!unknown")
 
     assert result["command"] == "invalid"
     assert "Unknown command" in result["message"]
@@ -93,36 +80,25 @@ def test_parse_message_unknown_command():
 
 def test_parse_message_without_prefix_ignored():
     """Test that messages without ! prefix are ignored."""
-    message = "track https://example.com/product"
-    result = parse_message(message)
-
-    assert result["command"] == "ignore"
+    assert parse_message("track https://example.com/product")["command"] == "ignore"
 
 
 def test_parse_message_regular_chat_ignored():
     """Test that regular chat messages are ignored."""
-    message = "hey, what's up?"
-    result = parse_message(message)
-
-    assert result["command"] == "ignore"
+    assert parse_message("hey, what's up?")["command"] == "ignore"
 
 
 def test_parse_message_command_case_insensitive():
     """Test that commands are case-insensitive."""
-    message = "!TRACK https://example.com/product"
-    result = parse_message(message)
+    result = parse_message("!TRACK https://example.com/product")
 
     assert result["command"] == "track"
     assert result["url"] == "https://example.com/product"
 
 
 def test_parse_message_prefix_with_space():
-    """Test that ! with space before command still works."""
-    message = "! help"
-    result = parse_message(message)
-
-    # Should be ignored since there's a space after !
-    assert result["command"] == "ignore"
+    """Test that ! with space before command is ignored."""
+    assert parse_message("! help")["command"] == "ignore"
 
 
 def test_handle_help_message():
@@ -140,11 +116,8 @@ def test_handle_help_message():
 @patch("services.listener.get_db_session")
 def test_handle_list_tracked_items_empty(mock_get_db_session):
     """Test listing tracked items when there are none for the user."""
-    # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
-
-    # Mock the query result (empty list)
     mock_session.query.return_value.filter.return_value.all.return_value = []
 
     result = handle_list_tracked_items(user_id=1)
@@ -156,31 +129,19 @@ def test_handle_list_tracked_items_empty(mock_get_db_session):
 @patch("services.listener.get_db_session")
 def test_handle_list_tracked_items_with_products(mock_get_db_session):
     """Test listing tracked items when there are products for the user."""
-    # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
-    # Create mock products
-    mock_product1 = MagicMock()
-    mock_product1.id = 1
-    mock_product1.title = "Test Product 1"
-    mock_product1.url = "https://example.com/product1"
-    mock_product1.target_price = 90.0
+    mock_product1 = MagicMock(
+        id=1, title="Test Product 1", url="https://example.com/product1", target_price=90.0
+    )
+    mock_product2 = MagicMock(
+        id=2, title="Test Product 2", url="https://example.com/product2", target_price=80.0
+    )
 
-    mock_product2 = MagicMock()
-    mock_product2.id = 2
-    mock_product2.title = "Test Product 2"
-    mock_product2.url = "https://example.com/product2"
-    mock_product2.target_price = 80.0
+    mock_price_history1 = MagicMock(price=100.0)
+    mock_price_history2 = MagicMock(price=95.0)
 
-    # Mock the price history query
-    mock_price_history1 = MagicMock()
-    mock_price_history1.price = 100.0
-
-    mock_price_history2 = MagicMock()
-    mock_price_history2.price = 95.0
-
-    # Create separate mock chains for product query and price history queries
     mock_product_filter = MagicMock()
     mock_product_filter.all.return_value = [mock_product1, mock_product2]
 
@@ -189,7 +150,6 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
     mock_price_filter.order_by.return_value = mock_price_order
     mock_price_order.first.side_effect = [mock_price_history1, mock_price_history2]
 
-    # Track which query is being called (DBProduct vs PriceHistory)
     call_count = [0]
 
     def mock_filter_side_effect(*args, **kwargs):
@@ -213,26 +173,17 @@ def test_handle_list_tracked_items_with_products(mock_get_db_session):
 @patch("services.listener.get_db_session")
 def test_stop_tracking_item_valid(mock_get_db_session):
     """Test stopping tracking an item with a valid index."""
-    # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
-    # Create mock products
-    mock_product1 = MagicMock()
-    mock_product1.id = 1
-    mock_product1.title = "Test Product 1"
-
-    mock_product2 = MagicMock()
-    mock_product2.id = 2
-    mock_product2.title = "Test Product 2"
-
-    # Mock the query result (filtered by user_id)
+    mock_product1 = MagicMock(id=1, title="Test Product 1")
+    mock_product2 = MagicMock(id=2, title="Test Product 2")
     mock_session.query.return_value.filter.return_value.all.return_value = [
         mock_product1,
         mock_product2,
     ]
 
-    result = stop_tracking_item(0, user_id=1)  # Stop tracking the first product
+    result = stop_tracking_item(0, user_id=1)
 
     assert "Stopped tracking: Test Product 1" in result
     mock_session.delete.assert_called_once_with(mock_product1)
@@ -243,19 +194,13 @@ def test_stop_tracking_item_valid(mock_get_db_session):
 @patch("services.listener.get_db_session")
 def test_stop_tracking_item_invalid_index(mock_get_db_session):
     """Test stopping tracking an item with an invalid index."""
-    # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
-    # Create mock products
-    mock_product1 = MagicMock()
-    mock_product1.id = 1
-    mock_product1.title = "Test Product 1"
-
-    # Mock the query result (filtered by user_id)
+    mock_product1 = MagicMock(id=1, title="Test Product 1")
     mock_session.query.return_value.filter.return_value.all.return_value = [mock_product1]
 
-    result = stop_tracking_item(1, user_id=1)  # Invalid index
+    result = stop_tracking_item(1, user_id=1)
 
     assert "Invalid number" in result
     mock_session.delete.assert_not_called()
@@ -266,19 +211,11 @@ def test_stop_tracking_item_invalid_index(mock_get_db_session):
 @patch("services.listener.get_db_session")
 def test_stop_tracking_item_exception(mock_get_db_session):
     """Test stopping tracking an item when an exception occurs."""
-    # Mock the database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
-    # Create mock products
-    mock_product1 = MagicMock()
-    mock_product1.id = 1
-    mock_product1.title = "Test Product 1"
-
-    # Mock the query result (filtered by user_id)
+    mock_product1 = MagicMock(id=1, title="Test Product 1")
     mock_session.query.return_value.filter.return_value.all.return_value = [mock_product1]
-
-    # Mock an exception during delete
     mock_session.delete.side_effect = Exception("Database error")
 
     result = stop_tracking_item(0, user_id=1)
@@ -314,45 +251,102 @@ def test_listen_to_group_track_command(
     mock_run,
 ):
     """Test the listen_to_group function with a track command."""
-    # Set up the mock settings
     mock_settings.SIGNAL_GROUP_ID = "test-group-id"
     mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
 
-    # Set up the mock subprocess run result (JSON output)
-    mock_result = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
-    mock_run.return_value = mock_result
+    mock_run.return_value = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
 
-    # Set up mock signal message from parse_signal_json
-    mock_signal_msg = MagicMock()
-    mock_signal_msg.group_id = "test-group-id"
-    mock_signal_msg.sender_phone = "+1234567890"
-    mock_signal_msg.sender_name = "Test User"
-    mock_signal_msg.message = "!track https://example.com/product 90.00"
+    mock_signal_msg = MagicMock(
+        group_id="test-group-id",
+        sender_phone="+1234567890",
+        sender_name="Test User",
+        message="!track https://example.com/product 90.00",
+    )
     mock_parse_signal_json.return_value = [mock_signal_msg]
 
-    # Set up mock user
-    mock_user = MagicMock()
-    mock_user.id = 1
+    mock_user = MagicMock(id=1)
     mock_get_or_create_user.return_value = mock_user
 
-    # Set up the mock database session
     mock_session = MagicMock()
     mock_get_db_session.return_value = mock_session
 
-    # Set up mock handle_track_command result
     mock_handle_track.return_value = "Now tracking: Test Product"
 
-    # Make the function exit after one iteration
     mock_sleep.side_effect = Exception("Stop the loop")
 
-    # Call the function
     with pytest.raises(Exception, match="Stop the loop"):
         listen_to_group()
 
-    # Verify the function calls
     mock_run.assert_called_once()
     mock_parse_signal_json.assert_called_once()
     mock_get_or_create_user.assert_called_once_with(mock_session, "+1234567890", "Test User")
     mock_handle_track.assert_called_once_with("https://example.com/product", 90.0, 1)
     mock_send_message.assert_called_once_with("test-group-id", "Now tracking: Test Product")
+    mock_sleep.assert_called_once()
+
+
+@patch("services.listener.send_signal_message_to_group")
+def test_send_response_to_group(mock_send_to_group):
+    """Test send_response sends to group when group_id is provided."""
+    send_response("test-group-id", "+1234567890", "Test message")
+    mock_send_to_group.assert_called_once_with("test-group-id", "Test message")
+
+
+@patch("services.listener.send_signal_message_to_user")
+def test_send_response_to_user(mock_send_to_user):
+    """Test send_response sends direct message when group_id is None."""
+    send_response(None, "+1234567890", "Test message")
+    mock_send_to_user.assert_called_once_with("+1234567890", "Test message")
+
+
+@patch("services.listener.subprocess.run")
+@patch("services.listener.time.sleep")
+@patch("services.listener.parse_signal_json")
+@patch("services.listener.get_or_create_signal_user")
+@patch("services.listener.handle_track_command")
+@patch("services.listener.get_db_session")
+@patch("services.listener.send_response")
+@patch("services.listener.settings")
+def test_listen_for_messages_direct_message(
+    mock_settings,
+    mock_send_response,
+    mock_get_db_session,
+    mock_handle_track,
+    mock_get_or_create_user,
+    mock_parse_signal_json,
+    mock_sleep,
+    mock_run,
+):
+    """Test listen_for_messages handles direct messages (no group_id)."""
+    mock_settings.SIGNAL_GROUP_ID = "test-group-id"
+    mock_settings.SIGNAL_PHONE_NUMBER = "test-phone-number"
+
+    mock_run.return_value = MockSubprocessResult(0, '{"envelope": {"source": "+1234567890"}}')
+
+    mock_signal_msg = MagicMock(
+        group_id=None,
+        sender_phone="+1234567890",
+        sender_name="Test User",
+        message="!track https://example.com/product 90.00",
+    )
+    mock_parse_signal_json.return_value = [mock_signal_msg]
+
+    mock_user = MagicMock(id=1)
+    mock_get_or_create_user.return_value = mock_user
+
+    mock_session = MagicMock()
+    mock_get_db_session.return_value = mock_session
+
+    mock_handle_track.return_value = "Now tracking: Test Product"
+
+    mock_sleep.side_effect = Exception("Stop the loop")
+
+    with pytest.raises(Exception, match="Stop the loop"):
+        listen_for_messages()
+
+    mock_run.assert_called_once()
+    mock_parse_signal_json.assert_called_once()
+    mock_get_or_create_user.assert_called_once_with(mock_session, "+1234567890", "Test User")
+    mock_handle_track.assert_called_once_with("https://example.com/product", 90.0, 1)
+    mock_send_response.assert_called_once_with(None, "+1234567890", "Now tracking: Test Product")
     mock_sleep.assert_called_once()
