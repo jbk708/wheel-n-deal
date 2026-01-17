@@ -1,6 +1,7 @@
 import re
 import subprocess
 import time
+from zoneinfo import ZoneInfo
 
 from config import settings
 from models import PriceHistory, get_db_session
@@ -117,7 +118,8 @@ def handle_list_tracked_items(user_id: int) -> str:
 
             if latest_price:
                 current_price = f"${latest_price.price}"
-                last_updated = latest_price.timestamp.strftime("%b %d, %I:%M %p")
+                pacific_time = latest_price.timestamp.astimezone(ZoneInfo("America/Los_Angeles"))
+                last_updated = pacific_time.strftime("%b %d, %I:%M %p")
             else:
                 current_price = "Unknown"
                 last_updated = "Never"
