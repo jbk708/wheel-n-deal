@@ -36,6 +36,9 @@ Execute releases against a target environment — full deploy, incremental updat
 - After two consecutive failed deploy attempts: stop. Read the full error, check actual tool behavior against assumptions, then write one fix addressing the root cause — do not iterate blindly.
 - duckling2 is reached over Tailscale only (`100.77.39.5`; LAN SSH is firewalled). `~/wheel-n-deal/.env` (`LLM_API_KEY`, `NTFY_TOKEN`) and `config.yaml` are hand-provisioned and never written by deploy.sh. Never print `.env`; check variable names only (`cut -d= -f1`).
 - Container: host networking, no published ports, `mem_limit` ~512m. No headless browser.
+- Deploy = `scripts/deploy.sh duckling2@100.77.39.5 vX.Y.Z` from a clean tree with the tag pushed. It runs `docker compose -p wheel-n-deal -f compose.yaml up -d --build --wait --wait-timeout 60` in `releases/<tag>` and repoints `current` only once healthy; on failure it prints the last 50 log lines and `current` stays on the old release. Rollback = deploy an older tag.
+- `config.yaml` and `data/` on the host must be owned by uid 1000 before the first `up`; otherwise Docker creates them as root (a missing `config.yaml` becomes a directory) and the non-root app cannot use them. `data_dir` in config must stay `/data` or the healthcheck never passes.
+- Health = `/data/heartbeat` mtime younger than 180s (touched every 30s by its own task), so a healthy container says nothing about whether sites are being checked — read the per-run summary line in the logs for that.
 - Prefer an idempotent recovery/heal path over a full redeploy when cluster or service health is in doubt.
 
 ## Output Contract

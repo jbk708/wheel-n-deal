@@ -8,18 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T11: README and docs rewrite
-**Description:** Document the rebuilt service for a new reader: what it does, config, run, deploy.
-
-**Deliverables:**
-- [ ] `README.md`: purpose, politeness/no-evasion stance, config reference, local run, deploy and rollback, troubleshooting (blocked sites, MiMo down)
-- [ ] Remove stale `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, `docs/DEPLOYMENT-DEBIAN.md`
-- [ ] Agent `## Memory` sections updated with deploy/health facts learned in T10
-
-**Dependencies:** T10
-
----
-
 ### T12: Retire legacy services
 **Description:** Delete the old stack now that the rebuild is live.
 
@@ -33,6 +21,18 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T11: README and docs rewrite
+**Description:** Document the rebuilt service for a new reader: what it does, config, run, deploy.
+
+**Deliverables:**
+- [x] `README.md`: purpose, politeness/no-evasion stance, config reference, local run, deploy and rollback, troubleshooting (blocked sites, MiMo down)
+- [x] Remove stale `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, `docs/DEPLOYMENT-DEBIAN.md`
+- [x] Agent `## Memory` sections updated with deploy/health facts learned in T10
+
+**Dependencies:** T10
+
+---
 
 ### T10: Container and deploy script
 **Description:** Package the service as one small container and deploy it to duckling2 with the house git-archive release script.

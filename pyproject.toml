@@ -36,8 +36,8 @@ asyncio_mode = "auto"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-# Legacy stack and its docs: read-only reference until retired/rewritten.
-extend-exclude = ["backend", "docs"]
+# Legacy stack: read-only reference until retired.
+extend-exclude = ["backend"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

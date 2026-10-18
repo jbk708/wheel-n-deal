@@ -26,10 +26,11 @@ Read-only diagnostics on the live environment — check health, investigate inci
 
 ## Memory
 
-<!-- Grow this with container name, health check, and state paths once the container ticket deploys. -->
-
 - Host: duckling2, `ssh duckling2@100.77.39.5` (Tailscale). Deploy root `~/wheel-n-deal/` (`releases/<tag>`, `current` symlink, `data/`, `config.yaml`, `.env`).
-- State: `~/wheel-n-deal/data/state.db` (sqlite) — read with `sqlite3 -readonly`.
+- State: `~/wheel-n-deal/data/state.db` (sqlite) — read with `sqlite3 -readonly`. Tables: `items`, `observations` (status `ok|blocked|stale|error`), `learned_selectors`, `alert_state`.
+- Compose project `wheel-n-deal`: `cd ~/wheel-n-deal/current && docker compose -p wheel-n-deal ps` / `logs --tail 100`. `current` points at the active `releases/<tag>`.
+- Health: Docker HEALTHCHECK fails when `/data/heartbeat` is older than 180s (touched every 30s). Unhealthy usually means `data/` is not writable by uid 1000 or `data_dir` is not `/data`. Healthy only proves the event loop is alive; each run logs a `checked / ok / blocked / failed` summary line — check that for actual progress.
+- `stale` on every run with `MiMo skipped: LLM_API_KEY is not set` = missing env var, not a MiMo outage. ntfy failures log `ntfy publish failed: …` and leave the alert armed for the next check.
 - Never print `~/wheel-n-deal/.env` or the heartbeat URL.
 - `status=blocked` on a site is an expected outcome (no bot evasion by design), not an incident. MiMo being down for hours is also expected: observations go `stale`, alerts still send.
 
