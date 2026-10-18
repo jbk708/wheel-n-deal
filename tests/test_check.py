@@ -15,6 +15,7 @@ from wheel_n_deal.store import (
     create_observation,
     open_store,
     read_observations,
+    read_selector,
     write_item,
 )
 
@@ -182,3 +183,59 @@ async def test_shopify_js_bad_json_falls_back_to_mimo(client, conn):
         status, _ = await _check(client, conn, url)
     assert llm.call_count == 1
     assert status is Status.OK
+
+
+LEARNABLE_PAGE = "<html><body><h1>Grinder</h1><div id='buy'><b>Now $87.00</b></div></body></html>"
+MOVED_PAGE = "<html><body><h1>Grinder</h1><section><i>Now $79.00</i></section></body></html>"
+
+
+async def test_learned_selector_skips_mimo_until_it_breaks(client, conn):
+    url = "https://shop.example/products/grinder"
+    item = WatchItem(url=url, name="Thing", target_price=100)
+    item_id = write_item(conn, item.url, item.name, item.target_price)
+    mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
+    with respx.mock:
+        page = respx.get(url).respond(200, text=LEARNABLE_PAGE)
+        llm = respx.post(COMPLETIONS).respond(200, json=_llm_answer())
+        first = await check_item(client, conn, mimo, item_id, item, AT)
+        assert read_selector(conn, item_id) == "css:#buy > b:nth-of-type(1)"
+
+        second = await check_item(client, conn, mimo, item_id, item, AT)
+        assert llm.call_count == 1
+
+        page.respond(200, text=MOVED_PAGE)
+        llm.respond(200, json=_llm_answer(price=79.0, evidence="Now $79.00"))
+        third = await check_item(client, conn, mimo, item_id, item, AT)
+    assert llm.call_count == 2
+    assert [o.price for o in (first, second, third)] == [87.0, 87.0, 79.0]
+    assert all(o.status is Status.OK for o in (first, second, third))
+    assert read_selector(conn, item_id) == (
+        "css:body:nth-of-type(1) > section:nth-of-type(1) > i:nth-of-type(1)"
+    )
+
+
+async def test_price_not_on_page_saves_no_selector(client, conn):
+    url = "https://shop.example/products/grinder"
+    with respx.mock:
+        respx.get(url).respond(200, text=NO_PRICE_PAGE)
+        respx.post(COMPLETIONS).respond(200, json=_llm_answer(price=85.0, evidence="$85"))
+        status, _ = await _check(client, conn, url)
+    assert status is Status.OK
+    assert read_selector(conn, 1) is None
+
+
+async def test_broken_selector_with_mimo_down_is_dropped_and_stale(client, conn):
+    url = "https://shop.example/products/grinder"
+    item = WatchItem(url=url, name="Thing", target_price=100)
+    item_id = write_item(conn, item.url, item.name, item.target_price)
+    mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
+    with respx.mock:
+        respx.get(url).respond(200, text=LEARNABLE_PAGE)
+        respx.post(COMPLETIONS).respond(200, json=_llm_answer())
+        await check_item(client, conn, mimo, item_id, item, AT)
+    with respx.mock:
+        respx.get(url).respond(200, text=MOVED_PAGE)
+        respx.post(COMPLETIONS).mock(side_effect=httpx.ConnectError("down"))
+        obs = await check_item(client, conn, mimo, item_id, item, AT)
+    assert (obs.status, obs.price) == (Status.STALE, 87.0)
+    assert read_selector(conn, item_id) is None

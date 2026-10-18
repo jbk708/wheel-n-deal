@@ -7,8 +7,17 @@ import httpx
 from wheel_n_deal.config import WatchItem
 from wheel_n_deal.extract import Extraction, extract, extract_shopify_js, shopify_js_url
 from wheel_n_deal.fetch import FetchResult, FetchStatus, fetch
+from wheel_n_deal.learned import derive_selector, read_price
 from wheel_n_deal.llm import MiMo
-from wheel_n_deal.store import Observation, Status, create_observation, read_last_priced
+from wheel_n_deal.store import (
+    Observation,
+    Status,
+    create_observation,
+    delete_selector,
+    read_last_priced,
+    read_selector,
+    write_selector,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +37,28 @@ async def read_shopify_extraction(
         return None
 
 
-async def _read_page(
-    client: httpx.AsyncClient,
+def _read_learned(
+    conn: sqlite3.Connection, item_id: int, item: WatchItem, page: FetchResult
+) -> Extraction | None:
+    selector = read_selector(conn, item_id)
+    if not selector:
+        return None
+    price = read_price(page.body, selector)
+    if price:
+        return Extraction(price, None, None, selector)
+    logger.warning("learned selector broke: %s", item.name)
+    delete_selector(conn, item_id)
+    return None
+
+
+async def _read_with_mimo(
     conn: sqlite3.Connection,
     mimo: MiMo,
     item_id: int,
     item: WatchItem,
     page: FetchResult,
+    checked_at: str,
 ) -> tuple[Status, Extraction | None]:
-    found = extract(page.body, page.url) or await read_shopify_extraction(
-        client, page.body, page.url
-    )
-    if found:
-        logger.info("ok: %s %.2f via %s", item.name, found.price, found.source)
-        return Status.OK, found
     answer = await mimo.extract(page.url, page.body)
     if answer is None:
         last = read_last_priced(conn, item_id)
@@ -55,8 +72,31 @@ async def _read_page(
     if answer.price is None:
         logger.warning("no price found: %s", item.name)
         return Status.ERROR, None
-    logger.info("ok: %s %.2f via mimo", item.name, answer.price)
+    selector = derive_selector(page.body, answer.price, answer.evidence)
+    if selector:
+        write_selector(conn, item_id, selector, checked_at)
+    logger.info("ok: %s %.2f via mimo (learned: %s)", item.name, answer.price, selector)
     return Status.OK, Extraction(answer.price, answer.currency, answer.in_stock, "mimo")
+
+
+async def _read_page(
+    client: httpx.AsyncClient,
+    conn: sqlite3.Connection,
+    mimo: MiMo,
+    item_id: int,
+    item: WatchItem,
+    page: FetchResult,
+    checked_at: str,
+) -> tuple[Status, Extraction | None]:
+    found = (
+        extract(page.body, page.url)
+        or await read_shopify_extraction(client, page.body, page.url)
+        or _read_learned(conn, item_id, item, page)
+    )
+    if found:
+        logger.info("ok: %s %.2f via %s", item.name, found.price, found.source)
+        return Status.OK, found
+    return await _read_with_mimo(conn, mimo, item_id, item, page, checked_at)
 
 
 async def check_item(
@@ -76,7 +116,7 @@ async def check_item(
         logger.warning("fetch error: %s (%s)", item.name, fetched.reason)
         status = Status.ERROR
     else:
-        status, found = await _read_page(client, conn, mimo, item_id, item, fetched)
+        status, found = await _read_page(client, conn, mimo, item_id, item, fetched, checked_at)
     obs = Observation(
         item_id=item_id,
         checked_at=checked_at,

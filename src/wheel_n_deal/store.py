@@ -33,6 +33,13 @@ _SCHEMA = [
     """,
     "CREATE INDEX IF NOT EXISTS observations_item ON observations (item_id, checked_at)",
     """
+    CREATE TABLE IF NOT EXISTS learned_selectors (
+        item_id INTEGER PRIMARY KEY REFERENCES items(id),
+        selector TEXT NOT NULL,
+        learned_at TEXT NOT NULL
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS alert_state (
         item_id INTEGER PRIMARY KEY REFERENCES items(id),
         armed INTEGER NOT NULL,
@@ -136,3 +143,23 @@ def read_last_priced(conn: sqlite3.Connection, item_id: int) -> Observation | No
         (item_id,),
     ).fetchone()
     return _observation(row) if row else None
+
+
+def read_selector(conn: sqlite3.Connection, item_id: int) -> str | None:
+    row = conn.execute(
+        "SELECT selector FROM learned_selectors WHERE item_id = ?", (item_id,)
+    ).fetchone()
+    return row[0] if row else None
+
+
+def write_selector(conn: sqlite3.Connection, item_id: int, selector: str, at: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO learned_selectors (item_id, selector, learned_at) VALUES (?, ?, ?)",
+        (item_id, selector, at),
+    )
+    conn.commit()
+
+
+def delete_selector(conn: sqlite3.Connection, item_id: int) -> None:
+    conn.execute("DELETE FROM learned_selectors WHERE item_id = ?", (item_id,))
+    conn.commit()

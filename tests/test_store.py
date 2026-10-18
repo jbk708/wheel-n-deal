@@ -6,13 +6,16 @@ from wheel_n_deal.store import (
     Observation,
     Status,
     create_observation,
+    delete_selector,
     open_store,
     read_alert_armed,
     read_item_id,
     read_last_priced,
     read_observations,
+    read_selector,
     update_alert_armed,
     write_item,
+    write_selector,
 )
 
 
@@ -90,6 +93,17 @@ def test_read_last_priced_skips_priceless(tmp_path):
         conn, _obs(item_id, "2026-10-18T06:00:00+00:00", status=Status.ERROR, price=None)
     )
     assert read_last_priced(conn, item_id).price == 9.5
+
+
+def test_selector_crud(tmp_path):
+    conn = open_store(tmp_path / "state.db")
+    item_id = write_item(conn, "https://a.example/1", "A", 10.0)
+    assert read_selector(conn, item_id) is None
+    write_selector(conn, item_id, "css:#price", "2026-10-18T00:00:00+00:00")
+    write_selector(conn, item_id, "css:#new-price", "2026-10-18T06:00:00+00:00")
+    assert read_selector(conn, item_id) == "css:#new-price"
+    delete_selector(conn, item_id)
+    assert read_selector(conn, item_id) is None
 
 
 def test_status_values():

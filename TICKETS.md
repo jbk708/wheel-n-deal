@@ -8,19 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T8: Learned-selector cache
-**Description:** Remember where MiMo's evidence was found so later runs extract without calling MiMo until the page layout breaks.
-
-**Deliverables:**
-- [ ] After a MiMo success, derive a CSS path or JSON-LD key that locates the `evidence` text and validate it against the live page before saving
-- [ ] Store selectors per item (or per site) in SQLite; try them right after structured extraction and before MiMo
-- [ ] Selector fails → drop it and fall back to MiMo once
-- [ ] Tests: derivation, validation rejects non-matching selectors, cache hit skips MiMo
-
-**Dependencies:** T7
-
----
-
 ### T9: Deal verdict
 **Description:** On a new below-target alert, optionally ask MiMo once whether it is a real deal and include the verdict in the notification.
 
@@ -71,6 +58,19 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T8: Learned-selector cache
+**Description:** Remember where MiMo's evidence was found so later runs extract without calling MiMo until the page layout breaks.
+
+**Deliverables:**
+- [x] After a MiMo success, derive a CSS path or JSON-LD key that locates the `evidence` text and validate it against the live page before saving
+- [x] Store selectors per item (or per site) in SQLite; try them right after structured extraction and before MiMo
+- [x] Selector fails → drop it and fall back to MiMo once
+- [x] Tests: derivation, validation rejects non-matching selectors, cache hit skips MiMo
+
+**Dependencies:** T7
+
+---
 
 ### T7: MiMo extraction fallback
 **Description:** When structured extraction fails on a non-blocked page, ask MiMo to extract the price from a trimmed page view.
