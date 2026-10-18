@@ -8,20 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T4: Structured price extraction
-**Description:** Extract price, currency, and stock from structured data before anything else, porting the useful legacy helpers.
-
-**Deliverables:**
-- [ ] `extract.py` (pure functions on HTML/JSON): JSON-LD `Product` with `offers`, JSON-LD `ProductGroup` / `hasVariant` (Sephora), product meta tags (`og:price:amount`, `product:price:amount`, itemprop)
-- [ ] Shopify: detect store and read the `/products/<handle>.js` endpoint
-- [ ] Port still-useful per-site parsers from legacy `origin/dev` `backend/services/scraper.py` (Amazon, Costco, etc.) as pure helpers (BeautifulSoup is fine; no Selenium)
-- [ ] Result records which path found the price (JSON-LD key / meta name / selector) for the later selector cache
-- [ ] Saved HTML fixtures (scrubbed of personal data) and tests per extraction path
-
-**Dependencies:** T3
-
----
-
 ### T5: Scheduler and run loop with per-site politeness
 **Description:** Run a long-lived asyncio scheduler that checks each watched item on a jittered per-site schedule and records results.
 
@@ -127,6 +113,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T4: Structured price extraction
+**Description:** Extract price, currency, and stock from structured data before anything else, porting the useful legacy helpers.
+
+**Deliverables:**
+- [x] `extract.py` (pure functions on HTML/JSON): JSON-LD `Product` with `offers`, JSON-LD `ProductGroup` / `hasVariant` (Sephora), product meta tags (`og:price:amount`, `product:price:amount`, itemprop)
+- [x] Shopify: detect store and read the `/products/<handle>.js` endpoint
+- [x] Port still-useful per-site parsers from legacy `origin/dev` `backend/services/scraper.py` (Amazon, Costco, etc.) as pure helpers (BeautifulSoup is fine; no Selenium)
+- [x] Result records which path found the price (JSON-LD key / meta name / selector) for the later selector cache
+- [x] Saved HTML fixtures (scrubbed of personal data) and tests per extraction path
+
+**Dependencies:** T3
+
+---
 
 ### T3: Polite HTTP fetch layer
 **Description:** Fetch product pages with plain httpx and an honest User-Agent, resolve short links, and classify blocked responses.
