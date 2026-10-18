@@ -14,7 +14,7 @@ from wheel_n_deal.notify import (
     price_drop_message,
     publish,
 )
-from wheel_n_deal.store import Observation, Status, open_store, read_alert_armed, write_item
+from wheel_n_deal.store import Observation, Status, create_item, open_store, read_alert_armed
 
 NTFY = NtfyConfig(url="https://ntfy.example", topic="deals")
 TOKEN = "test-token"
@@ -107,7 +107,7 @@ async def test_publish_failure_returns_false_without_token_in_log(client, caplog
 
 
 async def test_alert_fires_once_then_rearms_after_recovery(client, conn):
-    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    item_id = create_item(conn, ITEM)
     with respx.mock:
         route = respx.post("https://ntfy.example/").respond(200)
         fired = [
@@ -119,7 +119,7 @@ async def test_alert_fires_once_then_rearms_after_recovery(client, conn):
 
 
 async def test_alert_ignores_non_ok_observations(client, conn):
-    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    item_id = create_item(conn, ITEM)
     with respx.mock:
         route = respx.post("https://ntfy.example/").respond(200)
         assert not await alert_on_price(
@@ -133,7 +133,7 @@ async def test_alert_ignores_non_ok_observations(client, conn):
 
 
 async def test_failed_publish_stays_armed_for_next_check(client, conn):
-    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    item_id = create_item(conn, ITEM)
     with respx.mock:
         respx.post("https://ntfy.example/").respond(503)
         assert not await alert_on_price(client, conn, NTFY, TOKEN, item_id, ITEM, _obs(90))
@@ -146,7 +146,7 @@ def test_price_drop_message_appends_verdict():
 
 
 async def test_alert_asks_verdict_once_per_alert(client, conn):
-    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    item_id = create_item(conn, ITEM)
     asked = []
 
     async def verdict() -> str:
@@ -163,7 +163,7 @@ async def test_alert_asks_verdict_once_per_alert(client, conn):
 
 
 async def test_alert_without_verdict_when_mimo_down(client, conn):
-    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    item_id = create_item(conn, ITEM)
 
     async def verdict() -> None:
         return None

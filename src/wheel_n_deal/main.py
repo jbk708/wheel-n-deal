@@ -30,17 +30,16 @@ from wheel_n_deal.scheduler import (
     run_sites,
     summary_line,
 )
-from wheel_n_deal.store import Status, open_store, read_observations, write_item
+from wheel_n_deal.store import Status, open_store, read_items, read_observations, seed_item
 
 logger = logging.getLogger(__name__)
 
 _HEARTBEAT_SECONDS = 30
 
 
-def sync_watch_list(conn: sqlite3.Connection, config: Config) -> dict[str, int]:
-    return {
-        item.url: write_item(conn, item.url, item.name, item.target_price) for item in config.watch
-    }
+def seed_watch_list(conn: sqlite3.Connection, config: Config) -> None:
+    for item in config.watch:
+        seed_item(conn, item)
 
 
 def _last_status(conn: sqlite3.Connection, item_id: int) -> Status | None:
@@ -55,22 +54,20 @@ def _last_checked(conn: sqlite3.Connection, item_id: int) -> float | None:
 
 def load_schedule(
     conn: sqlite3.Connection,
-    config: Config,
-    item_ids: dict[str, int],
+    items: dict[int, WatchItem],
     now: float,
+    interval_s: float,
+    jitter_s: float,
     rng: random.Random,
 ) -> dict[str, float]:
+    item_ids = {item.url: item_id for item_id, item in items.items()}
     last_checked: dict[str, float | None] = {}
-    for site, items in group_by_site(config.watch).items():
-        times = [t for item in items if (t := _last_checked(conn, item_ids[item.url])) is not None]
+    for site, site_items in group_by_site(items.values()).items():
+        times = [
+            t for item in site_items if (t := _last_checked(conn, item_ids[item.url])) is not None
+        ]
         last_checked[site] = max(times, default=None)
-    return initial_schedule(
-        last_checked,
-        now,
-        config.politeness.min_interval_hours * 3600,
-        config.politeness.jitter_minutes * 60,
-        rng,
-    )
+    return initial_schedule(last_checked, now, interval_s, jitter_s, rng)
 
 
 async def run_forever(
@@ -85,9 +82,12 @@ async def run_forever(
     rng = rng or random.Random()
     interval_s = config.politeness.min_interval_hours * 3600
     jitter_s = config.politeness.jitter_minutes * 60
-    item_ids = sync_watch_list(conn, config)
-    groups = group_by_site(config.watch)
-    schedule = load_schedule(conn, config, item_ids, clock(), rng)
+    seed_watch_list(conn, config)
+    items = read_items(conn)
+    logger.info("watching %d items", len(items))
+    item_ids = {item.url: item_id for item_id, item in items.items()}
+    groups = group_by_site(items.values())
+    schedule = load_schedule(conn, items, clock(), interval_s, jitter_s, rng)
 
     mimo = MiMo(client, config.llm, secrets.llm_api_key)
     newly_blocked: list[str] = []
@@ -152,6 +152,4 @@ def run() -> None:
     )
     # httpx logs every request URL at INFO; the heartbeat URL carries a token.
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    config = load_config(args.config)
-    logger.info("watching %d items", len(config.watch))
-    asyncio.run(_main(config))
+    asyncio.run(_main(load_config(args.config)))

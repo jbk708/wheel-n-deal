@@ -37,7 +37,7 @@ class PolitenessConfig(StrictModel):
 
 
 class Config(StrictModel):
-    watch: list[WatchItem]
+    watch: list[WatchItem] = []
     ntfy: NtfyConfig
     llm: LLMConfig
     politeness: PolitenessConfig = PolitenessConfig()

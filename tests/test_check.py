@@ -12,11 +12,11 @@ from wheel_n_deal.llm import MiMo
 from wheel_n_deal.store import (
     Observation,
     Status,
+    create_item,
     create_observation,
     open_store,
     read_observations,
     read_selector,
-    write_item,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -54,7 +54,7 @@ def conn(tmp_path):
 
 async def _check(client, conn, url: str, previous: list[Observation] = ()) -> tuple[Status, list]:
     item = WatchItem(url=url, name="Thing", target_price=100)
-    item_id = write_item(conn, item.url, item.name, item.target_price)
+    item_id = create_item(conn, item)
     for obs in previous:
         create_observation(conn, obs)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
@@ -81,7 +81,7 @@ async def test_ok_stores_price(client, conn):
 async def test_check_item_returns_page_only_when_fetched(client, conn):
     url = "https://shop.example/products/grinder"
     item = WatchItem(url=url, name="Thing", target_price=100)
-    item_id = write_item(conn, item.url, item.name, item.target_price)
+    item_id = create_item(conn, item)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
     html = (FIXTURES / "jsonld_product.html").read_text()
     with respx.mock:
@@ -206,7 +206,7 @@ MOVED_PAGE = "<html><body><h1>Grinder</h1><section><i>Now $79.00</i></section></
 async def test_learned_selector_skips_mimo_until_it_breaks(client, conn):
     url = "https://shop.example/products/grinder"
     item = WatchItem(url=url, name="Thing", target_price=100)
-    item_id = write_item(conn, item.url, item.name, item.target_price)
+    item_id = create_item(conn, item)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
     with respx.mock:
         page = respx.get(url).respond(200, text=LEARNABLE_PAGE)
@@ -265,7 +265,7 @@ async def test_mimo_price_not_on_page_without_history_is_stale_without_price(cli
 async def test_broken_selector_with_mimo_down_is_dropped_and_stale(client, conn):
     url = "https://shop.example/products/grinder"
     item = WatchItem(url=url, name="Thing", target_price=100)
-    item_id = write_item(conn, item.url, item.name, item.target_price)
+    item_id = create_item(conn, item)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
     with respx.mock:
         respx.get(url).respond(200, text=LEARNABLE_PAGE)
