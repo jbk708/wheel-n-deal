@@ -9,6 +9,7 @@ from wheel_n_deal.store import (
     open_store,
     read_alert_armed,
     read_item_id,
+    read_last_priced,
     read_observations,
     update_alert_armed,
     write_item,
@@ -78,6 +79,17 @@ def test_observations_scoped_to_item(tmp_path):
     b = write_item(conn, "https://shop.example/p/2", "B", 1.0)
     create_observation(conn, _obs(a, "2026-10-18T01:00:00+00:00"))
     assert read_observations(conn, b) == []
+
+
+def test_read_last_priced_skips_priceless(tmp_path):
+    conn = open_store(tmp_path / "state.db")
+    item_id = write_item(conn, "https://a.example/1", "A", 10.0)
+    assert read_last_priced(conn, item_id) is None
+    create_observation(conn, _obs(item_id, "2026-10-18T00:00:00+00:00", price=9.5))
+    create_observation(
+        conn, _obs(item_id, "2026-10-18T06:00:00+00:00", status=Status.ERROR, price=None)
+    )
+    assert read_last_priced(conn, item_id).price == 9.5
 
 
 def test_status_values():

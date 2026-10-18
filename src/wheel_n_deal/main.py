@@ -13,6 +13,7 @@ from wheel_n_deal.check import check_item
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
 from wheel_n_deal.fetch import make_client
 from wheel_n_deal.heartbeat import ping
+from wheel_n_deal.llm import MiMo
 from wheel_n_deal.notify import alert_on_price, blocked_message, publish
 from wheel_n_deal.scheduler import (
     due_sites,
@@ -79,13 +80,14 @@ async def run_forever(
     groups = group_by_site(config.watch)
     schedule = load_schedule(conn, config, item_ids, clock(), rng)
 
+    mimo = MiMo(client, config.llm, secrets.llm_api_key)
     newly_blocked: list[str] = []
 
     async def check(item: WatchItem) -> Status:
         item_id = item_ids[item.url]
         was_blocked = _last_status(conn, item_id) is Status.BLOCKED
         checked_at = datetime.fromtimestamp(clock(), UTC).isoformat()
-        obs = await check_item(client, conn, item_id, item, checked_at)
+        obs = await check_item(client, conn, mimo, item_id, item, checked_at)
         if obs.status is Status.BLOCKED and not was_blocked:
             newly_blocked.append(item.name)
         await alert_on_price(client, conn, config.ntfy, secrets.ntfy_token, item_id, item, obs)

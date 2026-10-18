@@ -52,6 +52,17 @@ class Observation:
     in_stock: bool | None
 
 
+def _observation(row: tuple) -> Observation:
+    return Observation(
+        item_id=row[0],
+        checked_at=row[1],
+        status=Status(row[2]),
+        price=row[3],
+        currency=row[4],
+        in_stock=None if row[5] is None else bool(row[5]),
+    )
+
+
 def open_store(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -102,17 +113,7 @@ def read_observations(
         " WHERE item_id = ? ORDER BY checked_at DESC, id DESC LIMIT ?",
         (item_id, -1 if limit is None else limit),
     )
-    return [
-        Observation(
-            item_id=row[0],
-            checked_at=row[1],
-            status=Status(row[2]),
-            price=row[3],
-            currency=row[4],
-            in_stock=None if row[5] is None else bool(row[5]),
-        )
-        for row in rows
-    ]
+    return [_observation(row) for row in rows]
 
 
 def read_alert_armed(conn: sqlite3.Connection, item_id: int) -> bool:
@@ -126,3 +127,12 @@ def update_alert_armed(conn: sqlite3.Connection, item_id: int, armed: bool, at: 
         (item_id, int(armed), at),
     )
     conn.commit()
+
+
+def read_last_priced(conn: sqlite3.Connection, item_id: int) -> Observation | None:
+    row = conn.execute(
+        "SELECT item_id, checked_at, status, price, currency, in_stock FROM observations"
+        " WHERE item_id = ? AND price IS NOT NULL ORDER BY checked_at DESC, id DESC LIMIT 1",
+        (item_id,),
+    ).fetchone()
+    return _observation(row) if row else None

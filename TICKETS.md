@@ -8,20 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T7: MiMo extraction fallback
-**Description:** When structured extraction fails on a non-blocked page, ask MiMo to extract the price from a trimmed page view.
-
-**Deliverables:**
-- [ ] `llm.py`: POST `{llm.base_url}/chat/completions`, model `mimo-v2.6-flash`, `Authorization: Bearer $LLM_API_KEY`, custom `User-Agent` (not `OpenAI/…`, which Cloudflare 403s), ≤90 s timeout, one request at a time
-- [ ] Page trimmer: title + H1 always kept, JSON-LD, product meta, main text, capped at 12k chars
-- [ ] Strict JSON output `{price, currency, in_stock, variant, condition, list_price, blocked, evidence}` validated with pydantic; invalid → treated as failure
-- [ ] MiMo unreachable/invalid → keep last known price, mark observation `stale`, never crash
-- [ ] Tests with respx (success, timeout, bad JSON, trimming keeps title/H1)
-
-**Dependencies:** T6
-
----
-
 ### T8: Learned-selector cache
 **Description:** Remember where MiMo's evidence was found so later runs extract without calling MiMo until the page layout breaks.
 
@@ -85,6 +71,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T7: MiMo extraction fallback
+**Description:** When structured extraction fails on a non-blocked page, ask MiMo to extract the price from a trimmed page view.
+
+**Deliverables:**
+- [x] `llm.py`: POST `{llm.base_url}/chat/completions`, model `mimo-v2.6-flash`, `Authorization: Bearer $LLM_API_KEY`, custom `User-Agent` (not `OpenAI/…`, which Cloudflare 403s), ≤90 s timeout, one request at a time
+- [x] Page trimmer: title + H1 always kept, JSON-LD, product meta, main text, capped at 12k chars
+- [x] Strict JSON output `{price, currency, in_stock, variant, condition, list_price, blocked, evidence}` validated with pydantic; invalid → treated as failure
+- [x] MiMo unreachable/invalid → keep last known price, mark observation `stale`, never crash
+- [x] Tests with respx (success, timeout, bad JSON, trimming keeps title/H1)
+
+**Dependencies:** T6
+
+---
 
 ### T6: ntfy alerts and heartbeat
 **Description:** Send one ntfy alert per drop below target and ping an optional heartbeat after each successful run.
