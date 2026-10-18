@@ -1,184 +1,102 @@
-# CLAUDE.md
+# wheel-n-deal
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Personal price tracker: a watch list in `config.yaml` → polite plain-HTTP fetch → structured price extraction (MiMo fallback only when that fails) → SQLite history → ntfy alert when a price drops below target. One long-lived container with an internal asyncio scheduler. See `README.md`.
 
-## Branch Strategy
+**This repo is PUBLIC.** Never commit secrets, `.env`, `*.db`, real phone numbers, hostnames of private services, or personal data.
 
-- **main**: Production-ready code only
-- **dev**: Integration branch for active development (permanent)
-- **feature branches**: Created from `dev`, merged back to `dev`
+## Rebuild status
 
-## Ticket Development Workflow
+The project is being rebuilt (tickets in `TICKETS.md`). Until the legacy-retirement ticket merges, the old stack still lives under `backend/` (FastAPI + Celery + Redis + Postgres + signal-cli + Selenium). Treat it as **read-only reference**: reuse its extraction helpers (JSON-LD, meta tags, per-site parsers), do not extend it. The newest parsers (Sephora, DedCool, Costco, improved generic fallback) exist only on the legacy `origin/dev` branch in `backend/services/scraper.py` — port from there, never merge `dev`.
 
-Follow this workflow for all ticket development:
+Target stack (house pattern, same as `release-triage` / `crosspoint-sync`): Python 3.12+ + uv, `src/wheel_n_deal/`, httpx, pydantic config loaded from YAML, SQLite in `/data`, pytest (+ respx), ruff check + format, `Dockerfile` + `compose.yaml`, `scripts/deploy.sh` (git-archive over ssh into `releases/<tag>` + `current` symlink + health wait), semver tags.
 
-1. **Branch**: Create a feature branch from `dev`
-2. **Stub**: Create function/class stubs with signatures and docstrings
-3. **Write Tests**: Write tests against the stubs (tests will fail initially)
-4. **Implement**: Fill in the implementation
-5. **Verify**: Run tests to confirm implementation is correct
-6. **Update Ticket**: Mark ticket complete in `docs/TICKETS.md` (include in PR)
-7. **Pre-PR Checks**: Before creating a PR, run these commands from `backend/`:
-   ```bash
-   uv run ruff check . --fix   # Fix linting issues
-   uv run ruff format .        # Format code
-   uv run ty check             # Type check
-   uv run pytest               # Run tests
-   ```
-8. **Simplify**: Run code simplifier as final step before PR
+Hard rules for this project:
+- **No bot evasion of any kind**: no stealth plugins, CAPTCHA solvers, residential proxies, rotating or spoofed User-Agents. Honest UA `wheel-n-deal/<version> (+personal price tracker)`. A blocked site is recorded as `status=blocked` and reported, not retried aggressively.
+- **Politeness**: per-site minimum interval (hours), jittered schedule, one request at a time per site.
+- **MiMo is optional infrastructure**: it can be down for hours. Every MiMo call degrades gracefully (keep last known price, mark stale, alert anyway); nothing crashes because the LLM is unreachable.
 
-### Conventions
+## Principles
 
-**Branch naming**: `{prefix}-{ticket}-{name}`
-- Prefixes: `feat`, `fix`, `refactor`, `docs`, `test`
-- Example: `feat-WND-001-price-alerts`
+### KISS — Keep It Simple
+- Write the smallest code that solves the problem.
+- No speculative features, flags, abstractions, or fallbacks.
+- Three similar lines beat a premature abstraction.
+- Delete unused code; don't preserve it "just in case."
 
-**Commit messages**: `{PREFIX}-{ticket}: {description}`
-- Example: `FEAT-WND-001: Stub out PriceAlertService`
-- Example: `FEAT-WND-001: Add tests for price threshold logic`
-- Example: `FEAT-WND-001: Implement price alert notifications`
+### CRUD — One Job Per Unit
+- Each function does one thing: **C**reate, **R**ead, **U**pdate, or **D**elete.
+- No mixed read+write side effects in a single path.
+- Pure where possible; push I/O to the boundaries.
+- State changes are explicit and localized.
 
-### Principles
+### Style
+- Code speaks for itself — no comments explaining *what*.
+- Comment only non-obvious *why* (constraints, invariants, gotchas).
+- Names carry meaning. If a comment is needed, try a better name first.
 
-- **Test-driven**: Write tests before implementation
-- **Self-documenting**: Use clear naming and type hints; code should explain itself
-- **Minimal inline comments**: Only comment non-obvious logic; prefer better naming over comments
+### Secrets
+- **Never** paste auth tokens, API keys, passwords, private keys, session cookies, OAuth/JWT tokens, `.env` contents, or any post-auth credential into the chat.
+- If a secret is needed, reference it by name (`LLM_API_KEY`, `NTFY_TOKEN`) and load it from the environment or a gitignored `.env` file.
+- If a secret is accidentally shared, treat it as compromised: rotate immediately, then scrub history (history rewrites and force-pushes need the user's explicit approval).
+- Do not commit secrets. `.env`, `*.pem`, `*.key`, `*.db`, `config.yaml`, and `data/` are gitignored.
+- Never log the heartbeat URL or any token.
 
-### Ticket Tracking
+## Agents
 
-See `docs/TICKETS.md` for active and completed tickets.
+A six-agent pipeline lives in `.claude/agents/` — see [`.claude/agents/README.md`](.claude/agents/README.md) for the roster, flow, and trigger threshold.
 
-## Project Overview
+Start with `team-lead` for any change broader than a single-line fix. It dispatches Planner ⇄ SWE to reconcile a plan, blocks on your explicit go-ahead, then runs SWE → QA → Deployer.
 
-Wheel-n-Deal is a price tracking and deal notification service that monitors product prices across e-commerce websites (Amazon, Walmart, Best Buy, Target, eBay) and sends notifications via Signal when prices drop.
+The agents' placeholders are filled in for the rebuilt stack (uv, pytest, ruff, shellcheck, `scripts/deploy.sh` to duckling2 over Tailscale). Grow each agent's `## Memory` section as the project teaches you things.
 
-## Development Commands
+## Commands
 
-All commands should be run from the `backend/` directory:
+From the repo root (valid once the scaffold ticket lands; before that, legacy commands run from `backend/`):
 
-```bash
-# Install dependencies
-uv sync
-
-# Run API server (development)
-uv run uvicorn main:app --reload
-
-# Run Celery worker (requires Redis)
-uv run celery -A celery_app worker --loglevel=info
-
-# Run tests with coverage
-uv run pytest
-
-# Run a single test file
-uv run pytest tests/test_scraper.py
-
-# Run a single test
-uv run pytest tests/test_scraper.py::test_function_name -v
-
-# Linting and formatting
-uv run ruff check .
-uv run ruff check . --fix
-uv run ruff format .
-
-# Type checking
-uv run ty check
-
-# Database migrations
-uv run alembic upgrade head        # Apply all migrations
-uv run alembic downgrade -1        # Rollback one migration
-uv run alembic revision --autogenerate -m "Description"  # Create new migration
-
-# Add a dependency
-uv add <package>
-
-# Add a dev dependency
-uv add --group dev <package>
+```sh
+uv sync                          # install
+uv run pytest                    # tests
+uv run ruff check .              # lint
+uv run ruff format --check .     # format check (uv run ruff format . to fix)
+shellcheck scripts/*.sh          # once scripts/deploy.sh exists
+uv run wheel-n-deal              # run the scheduler locally (needs config.yaml + .env)
 ```
 
-## Docker Commands
+## Workflow (One Ticket Per PR) — GitHub edition
 
-From the project root:
+Repo: `jbk708/wheel-n-deal` on GitHub. Default branch `main`; every PR targets `main` (the legacy `dev` branch is retired). **Auto-merge is disabled** on this repo — do not change repo settings.
 
-```bash
-./run_docker.sh start    # Start all services
-./run_docker.sh stop     # Stop all services
-./run_docker.sh restart  # Restart all services
-./run_docker.sh logs     # View logs
+Work in a separate worktree (e.g. `git worktree add ../wheel-n-deal-rebuild origin/main`), never in the user's primary checkout, which may hold uncommitted local changes.
+
+1. **Branch** — `git checkout -b t{N}-short-description origin/main`
+2. **Plan** — Read ticket, outline types/functions/tests, get approval.
+3. **Tests** — Write failing tests first; define expected behavior.
+4. **Implement** — Minimum code to pass tests.
+5. **Simplify** — Lint, format, all tests green, no warnings.
+6. **Done** — move the ticket to `## Done` in `TICKETS.md` in the same PR, deliverables checked.
+7. **PR** — `git push -u origin t{N}-short-description`, then `gh pr create --base main --title "T{N}: {Title}" --body '...'`.
+8. **CI** — `gh pr checks <n> --watch`; fix and push until green.
+9. **Merge** — `gh pr merge <n> --squash --delete-branch` (only on green). Then `git checkout main && git pull --ff-only`.
+
+Bookkeeping-only changes (ticket edits, workflow docs) go in `T0: …` PRs.
+
+Releases: tag `main` with semver `vX.Y.Z` (`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`), then `scripts/deploy.sh duckling2@100.77.39.5 vX.Y.Z`.
+
+## Attribution
+
+No AI attribution anywhere: no `Co-Authored-By: Claude…`, no `Claude-Session:` trailer, no "Generated with Claude Code" — not in commits, squash messages, PR titles or bodies.
+
+## Formats
+
+### Commit
+```
+T{N}: {verb} {what changed}
 ```
 
-## Architecture
+### PR Title
+```
+T{N}: {Ticket title}
+```
 
-### Backend Components (`backend/`)
-
-- **main.py**: FastAPI application entry point. Initializes database, starts Signal listener thread, and Prometheus metrics server on port 8001.
-
-- **celery_app.py**: Celery configuration using Redis as broker. Tasks are auto-discovered from `tasks/` directory.
-
-- **config.py**: Pydantic settings class (`Settings`) that loads configuration from environment variables and `.env` file.
-
-- **models.py** + **models/database.py**: SQLAlchemy models and database initialization. Uses SQLite by default, PostgreSQL in production.
-
-### Services (`backend/services/`)
-
-- **scraper.py**: Extracts product info (price, title) from e-commerce sites using BeautifulSoup and Selenium
-- **listener.py**: Signal group chat listener that processes user commands
-- **notification.py**: Sends price drop alerts via Signal
-
-### Tasks (`backend/tasks/`)
-
-- **price_check.py**: Celery task for scheduled price checking
-
-### Routers (`backend/routers/`)
-
-- **auth.py**: Authentication endpoints - login, token refresh (mounted at `/api/v1/auth`)
-- **tracker.py**: API endpoints for product tracking (mounted at `/api/v1/tracker`)
-
-### Utils (`backend/utils/`)
-
-- **logging.py**: Loguru-based logging configuration
-- **monitoring.py**: Prometheus metrics middleware
-- **security.py**: JWT authentication, rate limiting, IP blocking
-
-## Repository State (as of Jan 2026)
-
-### Working Features
-- REST API for product tracking (CRUD operations)
-- JWT authentication with OAuth2 password flow
-- Rate limiting on all API endpoints
-- Web scraping for Amazon, Walmart, Best Buy, Target, eBay + generic sites
-- Signal integration (listener and notifications)
-- Celery background tasks for price checking
-- Prometheus metrics and Loguru logging
-- Docker deployment with all services
-- Database migrations with Alembic
-
-### Known Limitations
-
-**Low Priority**:
-- Static user agent in scraper (easily detected)
-
-### Planned Features (Roadmap)
-
-**Phase 1 - User Identity**: Add User model, per-user product tracking (WND-024 to WND-027)
-
-**Phase 2 - Command Prefix**: Require `!` prefix for Signal commands (!track, !list, !stop), scope commands to sender's products (WND-028 to WND-032)
-
-**Phase 3 - Web Interface**: React frontend for browser-based product management (WND-033 to WND-039)
-
-**Phase 4 - Signal Bot Framework**: Extract reusable bot infrastructure into monorepo structure with plugin interface (WND-040 to WND-044)
-
-See `docs/TICKETS.md` for full ticket details and `docs/ARCHITECTURE.md` for system design.
-
-## Key Configuration
-
-- Environment variables: See `.env.example` for required settings
-- Ruff config: Root `pyproject.toml` defines linting rules (line length 100)
-- Pytest config: `backend/pyproject.toml` sets `pythonpath = "."` and `testpaths = ["tests"]`
-
-## Docker Services
-
-The `docker-compose.yml` runs:
-- **backend**: FastAPI on port 8000
-- **worker**: Celery worker
-- **broker**: Redis on port 6379
-- **postgres**: PostgreSQL on port 5432
+### PR Body
+Use **single quotes** around `gh pr create --body` content to avoid shell interpolation. Keep it short: what changed, how it was tested.
