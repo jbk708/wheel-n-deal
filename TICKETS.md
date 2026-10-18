@@ -8,20 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T1: Fix CI and repo hygiene
-**Description:** Make CI run on Python 3.12 so PRs can go green, and stop tracking databases and other private files in this public repo.
-
-**Deliverables:**
-- [ ] `.github/workflows/ci.yml`: Python 3.12, triggers on `push`/`pull_request` to `main` only, drop the Docker build job (legacy 2 GB image)
-- [ ] `.gitignore`: add `*.db`, `*.sqlite*`, `data/`, `config.yaml`, `.env*` (keep `!.env.example`), secrets patterns from the template
-- [ ] `.dockerignore`: `.git`, `.venv`, `.env*`, `*.db`, `data/`, `config.yaml`, caches, `tests/`
-- [ ] `git rm --cached backend/wheel_n_deal.db` (normal commit; no history rewrite or force-push — that needs separate user approval)
-- [ ] CI green on the PR
-
-**Dependencies:** none
-
----
-
 ### T2: Scaffold package, YAML config, and SQLite state
 **Description:** Create the root `src/wheel_n_deal/` package with pydantic config loaded from YAML and a SQLite store for price history and alert state.
 
@@ -171,6 +157,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T1: Fix CI and repo hygiene
+**Description:** Make CI run on Python 3.12 so PRs can go green, and stop tracking databases and other private files in this public repo.
+
+**Deliverables:**
+- [x] `.github/workflows/ci.yml`: Python 3.12, triggers on `push`/`pull_request` to `main` only, drop the Docker build job (legacy 2 GB image)
+- [x] `.gitignore`: add `*.db`, `*.sqlite*`, `data/`, `config.yaml`, `.env*` (keep `!.env.example`), secrets patterns from the template
+- [x] `.dockerignore`: `.git`, `.venv`, `.env*`, `*.db`, `data/`, `config.yaml`, caches, `tests/`
+- [x] `git rm --cached backend/wheel_n_deal.db` (normal commit; no history rewrite or force-push — that needs separate user approval)
+- [x] CI green on the PR
+
+**Dependencies:** none
+
+---
 
 ### T0: Migrate agent workflow and write rebuild backlog
 **Description:** Adopt the new-project-template workflow and plan the rebuild.

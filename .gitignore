@@ -126,6 +126,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -163,3 +165,27 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Secrets — never commit
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# Runtime state and host-provisioned config
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+data/
+config.yaml
+
+# Tooling
+.ruff_cache/
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
