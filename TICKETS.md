@@ -8,7 +8,16 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-_None._
+### T14: Purge the legacy SQLite file from git history
+**Description:** `main` no longer tracks `backend/wheel_n_deal.db` (untracked in T1, `*.db` ignored), but this repo is public and older commits still contain a version of that file with personal data (a user row with a phone number, plus email and password-hash columns). Removing it needs a history rewrite, which **requires the owner's explicit approval** before anyone starts.
+
+**Deliverables:**
+- [ ] Owner decides: rewrite history, or make the repo private (no action until then)
+- [ ] If rewriting: `git filter-repo --path backend/wheel_n_deal.db --invert-paths` on a fresh mirror clone, force-push all branches and tags, ask GitHub support to purge cached views if needed
+- [ ] Re-clone or reset every checkout and worktree afterwards (old SHAs, including release tags, change)
+- [ ] Confirm `git log --all -- backend/wheel_n_deal.db` is empty on the remote
+
+**Dependencies:** none (blocked on owner approval)
 
 ---
 
