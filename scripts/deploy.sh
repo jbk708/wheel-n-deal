@@ -115,7 +115,6 @@ ln -sfn "$base/.env" "$release_dir/.env"
 ln -sfn "$base/data" "$release_dir/data"
 
 cd "$release_dir"
-# -f: the legacy docker-compose.yml still sits in the tree until it is retired.
 compose=(docker compose -p wheel-n-deal -f compose.yaml)
 
 if ! "${compose[@]}" up -d --build --wait --wait-timeout 60; then

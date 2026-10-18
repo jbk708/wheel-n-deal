@@ -2,25 +2,29 @@
 
 One ticket per PR. Move completed tickets to **## Done**.
 
-**Legacy (pre-rebuild):** tickets WND-001 – WND-047 (Jan 2026) built the old FastAPI + Celery + Redis + Postgres + Signal + Selenium stack: uv/ruff/ty tooling, Alembic migrations, JWT auth, per-user tracking via Signal (`!track`, `!list`, `!stop`, `!me`), and scrapers for Amazon, Walmart, Best Buy, Target, eBay, Sephora, DedCool, Costco plus a generic fallback (WND-047 is on the legacy `dev` branch only). The open backlog (WND-048 Sephora JS prices, a React web UI, a Signal bot framework) is superseded by the rebuild below. The old `docs/TICKETS.md` is retired; its history remains in git.
+**Legacy (pre-rebuild):** tickets WND-001 – WND-047 (Jan 2026) built the old FastAPI + Celery + Redis + Postgres + Signal + Selenium stack: uv/ruff/ty tooling, Alembic migrations, JWT auth, per-user tracking via Signal (`!track`, `!list`, `!stop`, `!me`), and scrapers for Amazon, Walmart, Best Buy, Target, eBay, Sephora, DedCool, Costco plus a generic fallback (WND-047 is on the legacy `dev` branch only). The open backlog (WND-048 Sephora JS prices, a React web UI, a Signal bot framework) is superseded by the rebuild below. The legacy code (`backend/`) and the old `docs/TICKETS.md` are retired; their history remains in git.
 
 ---
 
 ## Open
 
-### T12: Retire legacy services
-**Description:** Delete the old stack now that the rebuild is live.
-
-**Deliverables:**
-- [ ] Remove `backend/` (FastAPI, Celery, Redis, Postgres, Alembic, Signal, JWT/REST API, Prometheus, Selenium), `docker-compose.yml`, `run_docker.sh`, `setup_dev.sh`, `.pre-commit-config.yaml` if unused
-- [ ] Remove legacy-only deps and ruff per-file ignores; CI still green
-- [ ] Note in `CLAUDE.md` that the rebuild is complete (drop the "Rebuild status" section)
-
-**Dependencies:** T11
+_None._
 
 ---
 
 ## Done
+
+### T12: Retire legacy services
+**Description:** Delete the old stack now that the rebuild is live.
+
+**Deliverables:**
+- [x] Remove `backend/` (FastAPI, Celery, Redis, Postgres, Alembic, Signal, JWT/REST API, Prometheus, Selenium), `docker-compose.yml`, `run_docker.sh`, `setup_dev.sh`, `.pre-commit-config.yaml` if unused
+- [x] Remove legacy-only deps and ruff per-file ignores; CI still green
+- [x] Note in `CLAUDE.md` that the rebuild is complete (drop the "Rebuild status" section)
+
+**Dependencies:** T11
+
+---
 
 ### T11: README and docs rewrite
 **Description:** Document the rebuilt service for a new reader: what it does, config, run, deploy.

@@ -36,8 +36,6 @@ asyncio_mode = "auto"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-# Legacy stack: read-only reference until retired.
-extend-exclude = ["backend"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

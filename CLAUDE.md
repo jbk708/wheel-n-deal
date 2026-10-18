@@ -4,11 +4,9 @@ Personal price tracker: a watch list in `config.yaml` → polite plain-HTTP fetc
 
 **This repo is PUBLIC.** Never commit secrets, `.env`, `*.db`, real phone numbers, hostnames of private services, or personal data.
 
-## Rebuild status
+## Stack
 
-The project is being rebuilt (tickets in `TICKETS.md`). Until the legacy-retirement ticket merges, the old stack still lives under `backend/` (FastAPI + Celery + Redis + Postgres + signal-cli + Selenium). Treat it as **read-only reference**: reuse its extraction helpers (JSON-LD, meta tags, per-site parsers), do not extend it. The newest parsers (Sephora, DedCool, Costco, improved generic fallback) exist only on the legacy `origin/dev` branch in `backend/services/scraper.py` — port from there, never merge `dev`.
-
-Target stack (house pattern, same as `release-triage` / `crosspoint-sync`): Python 3.12+ + uv, `src/wheel_n_deal/`, httpx, pydantic config loaded from YAML, SQLite in `/data`, pytest (+ respx), ruff check + format, `Dockerfile` + `compose.yaml`, `scripts/deploy.sh` (git-archive over ssh into `releases/<tag>` + `current` symlink + health wait), semver tags.
+House pattern, same as `release-triage` / `crosspoint-sync`: Python 3.12+ + uv, `src/wheel_n_deal/`, httpx, pydantic config loaded from YAML, SQLite in `/data`, pytest (+ respx), ruff check + format, `Dockerfile` + `compose.yaml`, `scripts/deploy.sh` (git-archive over ssh into `releases/<tag>` + `current` symlink + health wait), semver tags. The pre-rebuild stack (FastAPI + Celery + Redis + Postgres + signal-cli + Selenium) has been retired; its history remains in git.
 
 Hard rules for this project:
 - **No bot evasion of any kind**: no stealth plugins, CAPTCHA solvers, residential proxies, rotating or spoofed User-Agents. Honest UA `wheel-n-deal/<version> (+personal price tracker)`. A blocked site is recorded as `status=blocked` and reported, not retried aggressively.
@@ -51,14 +49,14 @@ The agents' placeholders are filled in for the rebuilt stack (uv, pytest, ruff, 
 
 ## Commands
 
-From the repo root (legacy `backend/` is excluded from these gates):
+From the repo root:
 
 ```sh
 uv sync                          # install
 uv run pytest                    # tests
 uv run ruff check .              # lint
 uv run ruff format --check .     # format check (uv run ruff format . to fix)
-shellcheck scripts/*.sh          # once scripts/deploy.sh exists
+shellcheck scripts/*.sh          # deploy script
 uv run wheel-n-deal              # run the scheduler locally (needs config.yaml + .env)
 ```
 
