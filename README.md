@@ -69,6 +69,23 @@ The run loop re-reads the watch list every minute, so items added or removed at 
 |---|---|
 | `LLM_API_KEY` | `Authorization: Bearer` for the LLM endpoint. If it is unset, the LLM steps are skipped. |
 | `NTFY_TOKEN` | `Authorization: Bearer` for ntfy. |
+| `WND_API_TOKEN` | Bearer token for the local API. If it is unset, the API is off and price checks still run. Generate one with `openssl rand -hex 32`. |
+
+## Local API
+
+The same process serves a small JSON API on `127.0.0.1:8090` (loopback only, never published), for an assistant running on the same host. Every route except `/healthz` needs `Authorization: Bearer $WND_API_TOKEN`; a missing or wrong token gets 401.
+
+| Route | Result |
+|---|---|
+| `GET /healthz` | 200 `{"ok": true}`, no auth. |
+| `GET /items` | Active items: `id`, `name`, `url`, `target_price`, `notes`, `last_price`, `currency`, `in_stock`, `last_checked`, `last_status` (`ok`/`blocked`/`stale`/`error`, or null before the first check). The price, currency and stock come from the last check that found a price. |
+| `POST /items` | Body `{"url", "name", "target_price", "notes"?}`. 201 with the new item; 409 if the URL is already watched; 400 if the body is invalid. Adding a URL that was removed earlier brings it back with its history. |
+| `DELETE /items/{id}` | 204. Stops watching the item; its history is kept. 404 if there is no such active item. |
+| `GET /items/{id}/history?limit=N` | Observations newest first (`checked_at`, `status`, `price`, `currency`, `in_stock`), default 30. |
+
+```sh
+curl -s -H "Authorization: Bearer $WND_API_TOKEN" http://127.0.0.1:8090/items
+```
 
 ## Run locally
 
@@ -94,7 +111,7 @@ shellcheck scripts/*.sh
 
 ## Deploy
 
-The service runs as one container (`compose.yaml`). It uses host networking with no published ports, `mem_limit: 512m`, runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted.
+The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 512m`, runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted.
 
 One-time setup on the host, under `~/wheel-n-deal/`: create `config.yaml`, `.env`, and `data/`, all owned by uid 1000. If they are missing, Docker creates the bind mounts as root, and a missing `config.yaml` becomes a directory.
 

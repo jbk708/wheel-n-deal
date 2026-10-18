@@ -21,24 +21,24 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ---
 
+## Done
+
 ### T17: Local HTTP API
 **Description:** A small HTTP API in the same process so a local assistant can list, add and remove watched items and read price history. Standard library only, bound to `127.0.0.1:8090`, bearer token from `WND_API_TOKEN`.
 
 **Deliverables:**
-- [ ] `GET /healthz` → 200 `{"ok": true}` (no auth)
-- [ ] `GET /items` → active items with latest price, currency, stock, last check time and status
-- [ ] `POST /items` `{url, name, target_price, notes?}` → 201 item; 409 if the URL is already watched; 400 on invalid input
-- [ ] `DELETE /items/{id}` → 204 (soft-remove); 404 if unknown or already removed
-- [ ] `GET /items/{id}/history?limit=N` (default 30) → observations, newest first
-- [ ] Every route except `/healthz` requires `Authorization: Bearer $WND_API_TOKEN` (constant-time compare); token unset → API disabled with a warning, price checks keep running
-- [ ] `.env.example`, compose comment, README API section
-- [ ] Tests for every route, auth, and error cases
+- [x] `GET /healthz` → 200 `{"ok": true}` (no auth)
+- [x] `GET /items` → active items with latest price, currency, stock, last check time and status
+- [x] `POST /items` `{url, name, target_price, notes?}` → 201 item; 409 if the URL is already watched; 400 on invalid input
+- [x] `DELETE /items/{id}` → 204 (soft-remove); 404 if unknown or already removed
+- [x] `GET /items/{id}/history?limit=N` (default 30) → observations, newest first
+- [x] Every route except `/healthz` requires `Authorization: Bearer $WND_API_TOKEN` (constant-time compare); token unset → API disabled with a warning, price checks keep running
+- [x] `.env.example`, compose comment, README API section
+- [x] Tests for every route, auth, and error cases
 
 **Dependencies:** T15, T16
 
 ---
-
-## Done
 
 ### T16: Scheduler picks up added and removed items without restart
 **Description:** Items added or removed at runtime (by the local API) are scheduled or dropped without restarting the container, while keeping the per-site politeness interval.

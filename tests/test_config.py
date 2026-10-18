@@ -107,18 +107,23 @@ heartbeat_url: https://kuma.example/api/push/x
 
 
 def test_secrets_from_env():
-    secrets = Secrets.from_env({"LLM_API_KEY": "k", "NTFY_TOKEN": "t"})
+    secrets = Secrets.from_env({"LLM_API_KEY": "k", "NTFY_TOKEN": "t", "WND_API_TOKEN": "a"})
     assert secrets.llm_api_key == "k"
     assert secrets.ntfy_token == "t"
+    assert secrets.api_token == "a"
 
 
 def test_secrets_missing_or_empty_are_none():
     secrets = Secrets.from_env({"NTFY_TOKEN": ""})
     assert secrets.llm_api_key is None
     assert secrets.ntfy_token is None
+    assert secrets.api_token is None
 
 
 def test_secrets_repr_hides_values():
-    secrets = Secrets.from_env({"LLM_API_KEY": "sekrit", "NTFY_TOKEN": "tok"})
+    secrets = Secrets.from_env(
+        {"LLM_API_KEY": "sekrit", "NTFY_TOKEN": "tok", "WND_API_TOKEN": "apitok"}
+    )
     assert "sekrit" not in repr(secrets)
     assert "tok" not in repr(secrets)
+    assert "apitok" not in repr(secrets)

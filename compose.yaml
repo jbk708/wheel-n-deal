@@ -5,7 +5,8 @@ services:
       args:
         APP_UID: "${APP_UID:-1000}"
         APP_GID: "${APP_GID:-1000}"
-    # Outbound only (shops, MiMo, ntfy over Tailscale); nothing listens, so no ports.
+    # Outbound to shops, MiMo and ntfy; the only listener is the API on 127.0.0.1:8090,
+    # reachable from this host only, so no ports are published.
     network_mode: host
     restart: unless-stopped
     mem_limit: 512m

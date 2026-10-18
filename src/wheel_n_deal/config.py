@@ -56,12 +56,14 @@ class Config(StrictModel):
 class Secrets:
     llm_api_key: str | None = field(repr=False)
     ntfy_token: str | None = field(repr=False)
+    api_token: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Secrets":
         return cls(
             llm_api_key=env.get("LLM_API_KEY") or None,
             ntfy_token=env.get("NTFY_TOKEN") or None,
+            api_token=env.get("WND_API_TOKEN") or None,
         )
 
 

@@ -1,6 +1,6 @@
 # wheel-n-deal
 
-Personal price tracker: a watch list in `config.yaml` → polite plain-HTTP fetch → structured price extraction (MiMo fallback only when that fails) → SQLite history → ntfy alert when a price drops below target. One long-lived container with an internal asyncio scheduler. See `README.md`.
+Personal price tracker: a watch list in SQLite (seeded from `config.yaml`, edited through a loopback-only HTTP API) → polite plain-HTTP fetch → structured price extraction (MiMo fallback only when that fails) → SQLite history → ntfy alert when a price drops below target. One long-lived container with an internal asyncio scheduler. See `README.md`.
 
 **This repo is PUBLIC.** Never commit secrets, `.env`, `*.db`, real phone numbers, hostnames of private services, or personal data.
 

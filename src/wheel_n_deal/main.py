@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from wheel_n_deal.api import start_api
 from wheel_n_deal.check import check_item
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
 from wheel_n_deal.fetch import make_client
@@ -146,11 +147,14 @@ async def touch_heartbeat(
 
 
 async def _main(config: Config) -> None:
-    conn = open_store(config.data_dir / "state.db")
+    db_path = config.data_dir / "state.db"
+    conn = open_store(db_path)
+    secrets = Secrets.from_env()
+    start_api(db_path, secrets.api_token)
     async with make_client() as client:
         await asyncio.gather(
             touch_heartbeat(config.data_dir / "heartbeat"),
-            run_forever(config, conn, client, Secrets.from_env()),
+            run_forever(config, conn, client, secrets),
         )
 
 
