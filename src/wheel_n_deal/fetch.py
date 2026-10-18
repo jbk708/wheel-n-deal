@@ -1,4 +1,3 @@
-import logging
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -6,8 +5,6 @@ from importlib.metadata import version
 from urllib.parse import urljoin, urlsplit
 
 import httpx
-
-logger = logging.getLogger(__name__)
 
 USER_AGENT = f"wheel-n-deal/{version('wheel-n-deal')} (+personal price tracker)"
 TIMEOUT_SECONDS = 30
@@ -88,7 +85,6 @@ async def fetch(client: httpx.AsyncClient, url: str) -> FetchResult:
         url = await resolve_short_link(client, url)
         response = await client.get(url)
     except httpx.HTTPError as exc:
-        logger.warning("fetch failed for %s: %s", url, type(exc).__name__)
         return FetchResult(url=url, status=FetchStatus.ERROR, reason=type(exc).__name__)
     final_url = str(response.url)
     reason = block_reason(response.status_code, response.text)

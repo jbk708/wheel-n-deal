@@ -8,20 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T5: Scheduler and run loop with per-site politeness
-**Description:** Run a long-lived asyncio scheduler that checks each watched item on a jittered per-site schedule and records results.
-
-**Deliverables:**
-- [ ] `main.py`: load config, open store, loop forever; `wheel-n-deal` entrypoint
-- [ ] Per-site (registrable domain) minimum interval of several hours, random jitter, one in-flight request per site
-- [ ] Each check: fetch → extract → store observation; blocked → `status=blocked`, logged, backed off to the next normal slot
-- [ ] Log one summary line per run (checked / ok / blocked / failed)
-- [ ] Tests for due-item selection, per-site serialization, and jitter bounds (fake clock)
-
-**Dependencies:** T4
-
----
-
 ### T6: ntfy alerts and heartbeat
 **Description:** Send one ntfy alert per drop below target and ping an optional heartbeat after each successful run.
 
@@ -113,6 +99,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T5: Scheduler and run loop with per-site politeness
+**Description:** Run a long-lived asyncio scheduler that checks each watched item on a jittered per-site schedule and records results.
+
+**Deliverables:**
+- [x] `main.py`: load config, open store, loop forever; `wheel-n-deal` entrypoint
+- [x] Per-site (registrable domain) minimum interval of several hours, random jitter, one in-flight request per site
+- [x] Each check: fetch → extract → store observation; blocked → `status=blocked`, logged, backed off to the next normal slot
+- [x] Log one summary line per run (checked / ok / blocked / failed)
+- [x] Tests for due-item selection, per-site serialization, and jitter bounds (fake clock)
+
+**Dependencies:** T4
+
+---
 
 ### T4: Structured price extraction
 **Description:** Extract price, currency, and stock from structured data before anything else, porting the useful legacy helpers.
