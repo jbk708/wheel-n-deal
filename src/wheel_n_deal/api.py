@@ -123,6 +123,9 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
                     self._dispatch(conn, method, url.path, url.query)
             except _BadRequest as exc:
                 self._send(exc.status, {"error": str(exc)})
+            except Exception:
+                logger.exception("api: %s %s failed", method, url.path)
+                self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "internal error"})
 
         def _dispatch(self, conn: sqlite3.Connection, method: str, path: str, query: str) -> None:
             item_path = _ITEM_PATH.fullmatch(path)
@@ -162,7 +165,10 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
             return hmac.compare_digest(given, expected)
 
         def _body(self) -> bytes:
-            length = int(self.headers.get("Content-Length") or 0)
+            header = self.headers.get("Content-Length") or "0"
+            if not (header.isascii() and header.isdigit()):
+                raise _BadRequest(HTTPStatus.BAD_REQUEST, "bad Content-Length")
+            length = int(header)
             if length > _MAX_BODY_BYTES:
                 raise _BadRequest(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "body too large")
             return self.rfile.read(length)

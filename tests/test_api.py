@@ -1,4 +1,5 @@
 import logging
+import socket
 import threading
 from datetime import UTC, datetime, timedelta
 
@@ -158,6 +159,19 @@ def test_add_rejects_invalid_body(api, body):
 def test_add_rejects_oversized_body(api):
     big = b'{"notes": "' + b"x" * 70_000 + b'"}'
     assert api.post("/items", headers=AUTH, content=big).status_code == 413
+
+
+@pytest.mark.parametrize("length", ["-1", "abc"])
+def test_add_rejects_bad_content_length(api, length):
+    host, port = api.base_url.host, api.base_url.port
+    request = (
+        f"POST /items HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {TOKEN}\r\n"
+        f"Content-Length: {length}\r\nConnection: close\r\n\r\n"
+    )
+    with socket.create_connection((host, port), timeout=5) as sock:
+        sock.sendall(request.encode())
+        status_line = sock.makefile("rb").readline()
+    assert status_line.split()[1] == b"400"
 
 
 def test_remove_item(api, db_path):
