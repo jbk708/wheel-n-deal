@@ -1,4 +1,5 @@
-"""MiMo extraction fallback for pages where structured extraction found no price.
+"""MiMo extraction fallback for pages where structured extraction found no price, and the
+optional deal verdict on a below-target alert.
 
 MiMo runs as a requeue-prone Slurm job behind LiteLLM and Cloudflare, so it can be gone for
 hours: every failure returns None and the caller keeps the last known price."""
@@ -8,13 +9,16 @@ import json
 import logging
 import re
 import time
+from typing import Literal
 
 import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from wheel_n_deal.config import LLMConfig
+from wheel_n_deal.config import LLMConfig, WatchItem
 from wheel_n_deal.fetch import USER_AGENT
+from wheel_n_deal.notify import money
+from wheel_n_deal.store import Observation, Status
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,28 @@ Rules:
 """
 
 
+_VERDICT_INSTRUCTIONS = """\
+A price tracker alert fired: the product below dropped under the shopper's target price.
+Judge whether it is a real deal, using the item's own price history and the page view.
+
+Reply with only a JSON object with exactly these keys, no prose:
+{"real_deal": true/false, "flags": [zero or more of "inflated_list_price",
+ "refurbished_or_used", "membership_only", "not_lowest_seen"], "reason": one short sentence}
+
+Flags:
+- "inflated_list_price": the "was"/list price is far above what the history shows it sells for.
+- "refurbished_or_used": the offer is refurbished, renewed, open-box, or used.
+- "membership_only": the price needs a membership, subscription, or club card.
+- "not_lowest_seen": the history has a clearly lower price than now.
+"""
+
+_HISTORY_ROWS = 60
+
+VerdictFlag = Literal[
+    "inflated_list_price", "refurbished_or_used", "membership_only", "not_lowest_seen"
+]
+
+
 class LLMExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -62,6 +88,14 @@ class LLMExtraction(BaseModel):
     list_price: float | None = Field(gt=0)
     blocked: bool
     evidence: str | None
+
+
+class LLMVerdict(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    real_deal: bool
+    flags: list[VerdictFlag]
+    reason: str
 
 
 def _text(tag) -> str:
@@ -104,13 +138,46 @@ def _candidates(content: str) -> list[str]:
     return [stripped, *_OBJECT.findall(stripped)]
 
 
-def parse_extraction(content: str | None) -> LLMExtraction | None:
+def _parse[M: BaseModel](model: type[M], content: str | None) -> M | None:
     for candidate in _candidates(content or ""):
         try:
-            return LLMExtraction.model_validate(json.loads(candidate))
+            return model.model_validate(json.loads(candidate))
         except (json.JSONDecodeError, ValidationError):
             continue
     return None
+
+
+def parse_extraction(content: str | None) -> LLMExtraction | None:
+    return _parse(LLMExtraction, content)
+
+
+def parse_verdict(content: str | None) -> LLMVerdict | None:
+    return _parse(LLMVerdict, content)
+
+
+def verdict_prompt(
+    item: WatchItem, price: float, currency: str | None, history: list[Observation], html: str
+) -> str:
+    rows = [
+        f"{obs.checked_at[:10]}: {money(obs.price, obs.currency)}"
+        for obs in history[:_HISTORY_ROWS]
+        if obs.status is Status.OK and obs.price is not None
+    ]
+    notes = f"Shopper notes: {item.notes}\n" if item.notes else ""
+    return (
+        f"{_VERDICT_INSTRUCTIONS}\nProduct: {item.name}\nURL: {item.url}\n{notes}"
+        f"Now {money(price, currency)}, target {money(item.target_price, currency)}\n"
+        f"\nPrice history, newest first:\n" + "\n".join(rows) + f"\n\n{trim_page(html)}"
+    )
+
+
+def format_verdict(verdict: LLMVerdict) -> str:
+    if verdict.real_deal:
+        head = "real deal"
+    else:
+        flags = ", ".join(flag.replace("_", " ") for flag in verdict.flags)
+        head = f"doubtful ({flags})" if flags else "doubtful"
+    return f"Verdict: {head}. {verdict.reason}"
 
 
 class MiMo:
@@ -142,21 +209,40 @@ class MiMo:
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
 
-    async def extract(self, url: str, html: str) -> LLMExtraction | None:
+    async def _ask(self, prompt: str) -> str | None:
         if not self._api_key:
             logger.warning("MiMo skipped: LLM_API_KEY is not set")
             return None
-        prompt = f"{_INSTRUCTIONS}\nURL: {url}\n\n{trim_page(html)}"
         async with self._lock:
             try:
-                content = await self._complete(prompt)
+                return await self._complete(prompt)
             except httpx.HTTPStatusError as exc:
                 logger.warning("MiMo unavailable: HTTP %d", exc.response.status_code)
-                return None
             except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
                 logger.warning("MiMo unavailable: %s", type(exc).__name__)
-                return None
+        return None
+
+    async def extract(self, url: str, html: str) -> LLMExtraction | None:
+        content = await self._ask(f"{_INSTRUCTIONS}\nURL: {url}\n\n{trim_page(html)}")
+        if content is None:
+            return None
         result = parse_extraction(content)
         if result is None:
             logger.warning("MiMo answer is not valid extraction JSON: %.200r", content)
+        return result
+
+    async def verdict(
+        self,
+        item: WatchItem,
+        price: float,
+        currency: str | None,
+        history: list[Observation],
+        html: str,
+    ) -> LLMVerdict | None:
+        content = await self._ask(verdict_prompt(item, price, currency, history, html))
+        if content is None:
+            return None
+        result = parse_verdict(content)
+        if result is None:
+            logger.warning("MiMo answer is not valid verdict JSON: %.200r", content)
         return result

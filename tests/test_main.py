@@ -106,3 +106,30 @@ def test_restart_respects_interval_since_last_check(tmp_path):
     now = datetime.fromisoformat("2026-10-18T12:00:00+00:00").timestamp()
     schedule = load_schedule(conn, config, ids, now, random.Random())
     assert schedule == {"shop.example": now + 4 * HOUR}
+
+
+async def test_price_drop_alert_carries_mimo_verdict(tmp_path):
+    config = _config(tmp_path, [URL_A], target_price=200)
+    conn = open_store(tmp_path / "state.db")
+    verdict = {"real_deal": True, "flags": [], "reason": "Lowest price seen."}
+    completion = {"choices": [{"message": {"content": json.dumps(verdict)}}]}
+
+    async def stop(seconds: float) -> None:
+        raise _Stop
+
+    page = (ROOT / "tests" / "fixtures" / "jsonld_product.html").read_text()
+    with respx.mock:
+        respx.get(URL_A).respond(200, text=page)
+        llm = respx.post("https://llm.example/v1/chat/completions").respond(200, json=completion)
+        ntfy = respx.post("https://ntfy.example/").respond(200)
+        respx.get(HEARTBEAT).respond(200)
+        async with make_client() as client:
+            try:
+                await run_forever(
+                    config, conn, client, Secrets(llm_api_key="k", ntfy_token="t"), sleep=stop
+                )
+            except _Stop:
+                pass
+    assert llm.call_count == 1
+    message = json.loads(ntfy.calls.last.request.content)["message"]
+    assert message.endswith("Verdict: real deal. Lowest price seen.")

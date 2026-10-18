@@ -5,9 +5,19 @@ import httpx
 import pytest
 import respx
 
-from wheel_n_deal.config import LLMConfig
+from wheel_n_deal.config import LLMConfig, WatchItem
 from wheel_n_deal.fetch import make_client
-from wheel_n_deal.llm import PAGE_VIEW_CHARS, MiMo, parse_extraction, trim_page
+from wheel_n_deal.llm import (
+    PAGE_VIEW_CHARS,
+    LLMVerdict,
+    MiMo,
+    format_verdict,
+    parse_extraction,
+    parse_verdict,
+    trim_page,
+    verdict_prompt,
+)
+from wheel_n_deal.store import Observation, Status
 
 LLM = LLMConfig(base_url="https://llm.example/v1")
 COMPLETIONS = "https://llm.example/v1/chat/completions"
@@ -151,3 +161,74 @@ async def test_extract_one_request_at_a_time(client):
         results = await asyncio.gather(*(mimo.extract("https://s.example", PAGE) for _ in range(3)))
     assert all(results)
     assert peak == 1
+
+
+ITEM = WatchItem(url="https://shop.example/kettle", name="Kettle", target_price=50)
+VERDICT = {"real_deal": False, "flags": ["inflated_list_price"], "reason": "Usually $43."}
+HISTORY = [
+    Observation(1, "2026-10-18T12:00:00+00:00", Status.OK, 42.5, "USD", True),
+    Observation(1, "2026-10-11T12:00:00+00:00", Status.OK, 43.0, "USD", True),
+    Observation(1, "2026-10-04T12:00:00+00:00", Status.BLOCKED, None, None, None),
+]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        None,
+        json.dumps({**VERDICT, "flags": ["cheap"]}),
+        json.dumps({**VERDICT, "extra": 1}),
+        json.dumps({k: v for k, v in VERDICT.items() if k != "reason"}),
+    ],
+)
+def test_parse_verdict_rejects_invalid(content):
+    assert parse_verdict(content) is None
+
+
+def test_verdict_prompt_has_history_target_and_page():
+    prompt = verdict_prompt(ITEM, 42.5, "USD", HISTORY, PAGE)
+    assert "Kettle" in prompt and "target $50.00" in prompt
+    assert "2026-10-11: $43.00" in prompt
+    assert "2026-10-04" not in prompt
+    assert "Electric Kettle" in prompt
+
+
+@pytest.mark.parametrize(
+    "verdict, expected",
+    [
+        (
+            LLMVerdict(real_deal=True, flags=[], reason="Lowest seen."),
+            "Verdict: real deal. Lowest seen.",
+        ),
+        (
+            LLMVerdict(
+                real_deal=False, flags=["refurbished_or_used", "membership_only"], reason="Meh."
+            ),
+            "Verdict: doubtful (refurbished or used, membership only). Meh.",
+        ),
+    ],
+)
+def test_format_verdict(verdict, expected):
+    assert format_verdict(verdict) == expected
+
+
+async def test_verdict_success(client):
+    mimo = MiMo(client, LLM, KEY)
+    with respx.mock:
+        route = respx.post(COMPLETIONS).respond(200, json=_completion(json.dumps(VERDICT)))
+        result = await mimo.verdict(ITEM, 42.5, "USD", HISTORY, PAGE)
+    assert result == LLMVerdict(**VERDICT)
+    assert (
+        "2026-10-11: $43.00"
+        in json.loads(route.calls.last.request.content)["messages"][-1]["content"]
+    )
+
+
+@pytest.mark.parametrize(
+    "side_effect", [httpx.ConnectError("down"), httpx.Response(502), httpx.Response(200, json={})]
+)
+async def test_verdict_failures_return_none(client, side_effect):
+    mimo = MiMo(client, LLM, KEY)
+    with respx.mock:
+        respx.post(COMPLETIONS).mock(side_effect=[side_effect])
+        assert await mimo.verdict(ITEM, 42.5, "USD", HISTORY, PAGE) is None

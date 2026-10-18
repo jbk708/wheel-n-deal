@@ -106,7 +106,8 @@ async def check_item(
     item_id: int,
     item: WatchItem,
     checked_at: str,
-) -> Observation:
+) -> tuple[Observation, str | None]:
+    """Return the stored observation and, when the page was fetched, its HTML."""
     fetched = await fetch(client, item.url)
     found = None
     if fetched.status is FetchStatus.BLOCKED:
@@ -126,4 +127,4 @@ async def check_item(
         in_stock=found.in_stock if found else None,
     )
     create_observation(conn, obs)
-    return obs
+    return obs, fetched.body if fetched.status is FetchStatus.OK else None

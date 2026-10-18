@@ -58,7 +58,7 @@ async def _check(client, conn, url: str, previous: list[Observation] = ()) -> tu
     for obs in previous:
         create_observation(conn, obs)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
-    obs = await check_item(client, conn, mimo, item_id, item, AT)
+    obs, _ = await check_item(client, conn, mimo, item_id, item, AT)
     assert obs == read_observations(conn, item_id, limit=1)[0]
     return obs.status, [obs]
 
@@ -76,6 +76,19 @@ async def test_ok_stores_price(client, conn):
         True,
         AT,
     )
+
+
+async def test_check_item_returns_page_only_when_fetched(client, conn):
+    url = "https://shop.example/products/grinder"
+    item = WatchItem(url=url, name="Thing", target_price=100)
+    item_id = write_item(conn, item.url, item.name, item.target_price)
+    mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
+    html = (FIXTURES / "jsonld_product.html").read_text()
+    with respx.mock:
+        route = respx.get(url).respond(200, text=html)
+        assert (await check_item(client, conn, mimo, item_id, item, AT))[1] == html
+        route.respond(403, text="denied")
+        assert (await check_item(client, conn, mimo, item_id, item, AT))[1] is None
 
 
 async def test_blocked_stores_blocked_without_price(client, conn):
@@ -197,15 +210,15 @@ async def test_learned_selector_skips_mimo_until_it_breaks(client, conn):
     with respx.mock:
         page = respx.get(url).respond(200, text=LEARNABLE_PAGE)
         llm = respx.post(COMPLETIONS).respond(200, json=_llm_answer())
-        first = await check_item(client, conn, mimo, item_id, item, AT)
+        first, _ = await check_item(client, conn, mimo, item_id, item, AT)
         assert read_selector(conn, item_id) == "css:#buy > b:nth-of-type(1)"
 
-        second = await check_item(client, conn, mimo, item_id, item, AT)
+        second, _ = await check_item(client, conn, mimo, item_id, item, AT)
         assert llm.call_count == 1
 
         page.respond(200, text=MOVED_PAGE)
         llm.respond(200, json=_llm_answer(price=79.0, evidence="Now $79.00"))
-        third = await check_item(client, conn, mimo, item_id, item, AT)
+        third, _ = await check_item(client, conn, mimo, item_id, item, AT)
     assert llm.call_count == 2
     assert [o.price for o in (first, second, third)] == [87.0, 87.0, 79.0]
     assert all(o.status is Status.OK for o in (first, second, third))
@@ -236,6 +249,6 @@ async def test_broken_selector_with_mimo_down_is_dropped_and_stale(client, conn)
     with respx.mock:
         respx.get(url).respond(200, text=MOVED_PAGE)
         respx.post(COMPLETIONS).mock(side_effect=httpx.ConnectError("down"))
-        obs = await check_item(client, conn, mimo, item_id, item, AT)
+        obs, _ = await check_item(client, conn, mimo, item_id, item, AT)
     assert (obs.status, obs.price) == (Status.STALE, 87.0)
     assert read_selector(conn, item_id) is None

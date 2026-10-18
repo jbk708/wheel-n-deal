@@ -138,3 +138,37 @@ async def test_failed_publish_stays_armed_for_next_check(client, conn):
         respx.post("https://ntfy.example/").respond(503)
         assert not await alert_on_price(client, conn, NTFY, TOKEN, item_id, ITEM, _obs(90))
     assert read_alert_armed(conn, item_id) is True
+
+
+def test_price_drop_message_appends_verdict():
+    message = price_drop_message(ITEM, 89.5, "USD", "Verdict: real deal. Lowest seen.")
+    assert message.message.endswith("\n\nVerdict: real deal. Lowest seen.")
+
+
+async def test_alert_asks_verdict_once_per_alert(client, conn):
+    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+    asked = []
+
+    async def verdict() -> str:
+        asked.append(1)
+        return "Verdict: real deal. Lowest seen."
+
+    with respx.mock:
+        route = respx.post("https://ntfy.example/").respond(200)
+        for price in (120, 90, 85, 110, 80):
+            await alert_on_price(client, conn, NTFY, TOKEN, item_id, ITEM, _obs(price), verdict)
+    assert len(asked) == 2
+    bodies = [json.loads(call.request.content)["message"] for call in route.calls]
+    assert all(body.endswith("Verdict: real deal. Lowest seen.") for body in bodies)
+
+
+async def test_alert_without_verdict_when_mimo_down(client, conn):
+    item_id = write_item(conn, ITEM.url, ITEM.name, ITEM.target_price)
+
+    async def verdict() -> None:
+        return None
+
+    with respx.mock:
+        route = respx.post("https://ntfy.example/").respond(200)
+        assert await alert_on_price(client, conn, NTFY, TOKEN, item_id, ITEM, _obs(90), verdict)
+    assert "Verdict" not in json.loads(route.calls.last.request.content)["message"]

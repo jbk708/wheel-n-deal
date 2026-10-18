@@ -8,18 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T9: Deal verdict
-**Description:** On a new below-target alert, optionally ask MiMo once whether it is a real deal and include the verdict in the notification.
-
-**Deliverables:**
-- [ ] One MiMo call per alert with the item's own price history, list price, condition, and variant: flags inflated list price, refurbished/used, membership-only pricing
-- [ ] Verdict appended to the ntfy message; MiMo down → alert sent without a verdict
-- [ ] Tests: verdict included, MiMo failure still alerts, called at most once per alert
-
-**Dependencies:** T8
-
----
-
 ### T10: Container and deploy script
 **Description:** Package the service as one small container and deploy it to duckling2 with the house git-archive release script.
 
@@ -58,6 +46,18 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T9: Deal verdict
+**Description:** On a new below-target alert, optionally ask MiMo once whether it is a real deal and include the verdict in the notification.
+
+**Deliverables:**
+- [x] One MiMo call per alert with the item's own price history, list price, condition, and variant: flags inflated list price, refurbished/used, membership-only pricing
+- [x] Verdict appended to the ntfy message; MiMo down → alert sent without a verdict
+- [x] Tests: verdict included, MiMo failure still alerts, called at most once per alert
+
+**Dependencies:** T8
+
+---
 
 ### T8: Learned-selector cache
 **Description:** Remember where MiMo's evidence was found so later runs extract without calling MiMo until the page layout breaks.

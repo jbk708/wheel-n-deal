@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 import httpx
@@ -21,19 +22,22 @@ class Message:
     click: str | None = None
 
 
-def _money(amount: float, currency: str | None) -> str:
+def money(amount: float, currency: str | None) -> str:
     if currency in (None, "USD"):
         return f"${amount:.2f}"
     return f"{amount:.2f} {currency}"
 
 
-def price_drop_message(item: WatchItem, price: float, currency: str | None) -> Message:
+def price_drop_message(
+    item: WatchItem, price: float, currency: str | None, verdict: str | None = None
+) -> Message:
+    text = (
+        f"{item.name} is {money(price, currency)}, below your "
+        f"{money(item.target_price, currency)} target."
+    )
     return Message(
         title=f"Price drop: {item.name}",
-        message=(
-            f"{item.name} is {_money(price, currency)}, below your "
-            f"{_money(item.target_price, currency)} target."
-        ),
+        message=f"{text}\n\n{verdict}" if verdict else text,
         tags=["moneybag"],
         priority=4,
         click=item.url,
@@ -103,15 +107,18 @@ async def alert_on_price(
     item_id: int,
     item: WatchItem,
     obs: Observation,
+    verdict: Callable[[], Awaitable[str | None]] | None = None,
 ) -> bool:
     if obs.status is not Status.OK or obs.price is None:
         return False
     armed = read_alert_armed(conn, item_id)
     fire, next_armed = next_alert_state(armed, obs.price, item.target_price)
+    sent = False
+    if fire:
+        note = await verdict() if verdict else None
+        message = price_drop_message(item, obs.price, obs.currency, note)
+        sent = await publish(client, ntfy, token, message)
     # A failed publish leaves the alert armed so the next check retries it.
-    sent = fire and await publish(
-        client, ntfy, token, price_drop_message(item, obs.price, obs.currency)
-    )
     if next_armed != armed and (sent or not fire):
         update_alert_armed(conn, item_id, next_armed, obs.checked_at)
     return sent
