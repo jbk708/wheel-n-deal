@@ -28,6 +28,7 @@ from wheel_n_deal.scheduler import (
     initial_schedule,
     next_due,
     run_sites,
+    site_of,
     summary_line,
 )
 from wheel_n_deal.store import Status, open_store, read_items, read_observations, seed_item
@@ -35,6 +36,8 @@ from wheel_n_deal.store import Status, open_store, read_items, read_observations
 logger = logging.getLogger(__name__)
 
 _HEARTBEAT_SECONDS = 30
+# How often the run loop re-reads the watch list, so API changes apply without a restart.
+_RELOAD_SECONDS = 60
 
 
 def seed_watch_list(conn: sqlite3.Connection, config: Config) -> None:
@@ -83,11 +86,8 @@ async def run_forever(
     interval_s = config.politeness.min_interval_hours * 3600
     jitter_s = config.politeness.jitter_minutes * 60
     seed_watch_list(conn, config)
-    items = read_items(conn)
-    logger.info("watching %d items", len(items))
-    item_ids = {item.url: item_id for item_id, item in items.items()}
-    groups = group_by_site(items.values())
-    schedule = load_schedule(conn, items, clock(), interval_s, jitter_s, rng)
+    watched: set[int] = set()
+    schedule: dict[str, float] = {}
 
     mimo = MiMo(client, config.llm, secrets.llm_api_key)
     newly_blocked: list[str] = []
@@ -111,6 +111,16 @@ async def run_forever(
         return obs.status
 
     while True:
+        items = read_items(conn)
+        if set(items) != watched:
+            watched = set(items)
+            logger.info("watching %d items", len(items))
+        item_ids = {item.url: item_id for item_id, item in items.items()}
+        groups = group_by_site(items.values())
+        new_items = {i: item for i, item in items.items() if site_of(item.url) not in schedule}
+        schedule = {site: due for site, due in schedule.items() if site in groups}
+        schedule |= load_schedule(conn, new_items, clock(), interval_s, jitter_s, rng)
+
         due = due_sites(schedule, clock())
         if due:
             statuses = await run_sites({site: groups[site] for site in due}, check)
@@ -123,7 +133,8 @@ async def run_forever(
             await ping(client, config.heartbeat_url)
             finished = clock()
             schedule.update({site: next_due(finished, interval_s, jitter_s, rng) for site in due})
-        await sleep(max(0.0, min(schedule.values(), default=clock() + interval_s) - clock()))
+        next_slot = min(schedule.values(), default=float("inf"))
+        await sleep(min(max(0.0, next_slot - clock()), _RELOAD_SECONDS))
 
 
 async def touch_heartbeat(
