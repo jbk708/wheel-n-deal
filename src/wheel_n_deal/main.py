@@ -10,8 +10,10 @@ from datetime import UTC, datetime
 import httpx
 
 from wheel_n_deal.check import check_item
-from wheel_n_deal.config import Config, WatchItem, load_config
+from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
 from wheel_n_deal.fetch import make_client
+from wheel_n_deal.heartbeat import ping
+from wheel_n_deal.notify import alert_on_price, blocked_message, publish
 from wheel_n_deal.scheduler import (
     due_sites,
     group_by_site,
@@ -29,6 +31,11 @@ def sync_watch_list(conn: sqlite3.Connection, config: Config) -> dict[str, int]:
     return {
         item.url: write_item(conn, item.url, item.name, item.target_price) for item in config.watch
     }
+
+
+def _last_status(conn: sqlite3.Connection, item_id: int) -> Status | None:
+    latest = read_observations(conn, item_id, limit=1)
+    return latest[0].status if latest else None
 
 
 def _last_checked(conn: sqlite3.Connection, item_id: int) -> float | None:
@@ -60,6 +67,7 @@ async def run_forever(
     config: Config,
     conn: sqlite3.Connection,
     client: httpx.AsyncClient,
+    secrets: Secrets,
     clock: Callable[[], float] = time.time,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     rng: random.Random | None = None,
@@ -71,15 +79,29 @@ async def run_forever(
     groups = group_by_site(config.watch)
     schedule = load_schedule(conn, config, item_ids, clock(), rng)
 
+    newly_blocked: list[str] = []
+
     async def check(item: WatchItem) -> Status:
+        item_id = item_ids[item.url]
+        was_blocked = _last_status(conn, item_id) is Status.BLOCKED
         checked_at = datetime.fromtimestamp(clock(), UTC).isoformat()
-        return await check_item(client, conn, item_ids[item.url], item, checked_at)
+        obs = await check_item(client, conn, item_id, item, checked_at)
+        if obs.status is Status.BLOCKED and not was_blocked:
+            newly_blocked.append(item.name)
+        await alert_on_price(client, conn, config.ntfy, secrets.ntfy_token, item_id, item, obs)
+        return obs.status
 
     while True:
         due = due_sites(schedule, clock())
         if due:
             statuses = await run_sites({site: groups[site] for site in due}, check)
             logger.info(summary_line(statuses))
+            if newly_blocked:
+                await publish(
+                    client, config.ntfy, secrets.ntfy_token, blocked_message(newly_blocked)
+                )
+                newly_blocked.clear()
+            await ping(client, config.heartbeat_url)
             finished = clock()
             schedule.update({site: next_due(finished, interval_s, jitter_s, rng) for site in due})
         await sleep(max(0.0, min(schedule.values(), default=clock() + interval_s) - clock()))
@@ -88,7 +110,7 @@ async def run_forever(
 async def _main(config: Config) -> None:
     conn = open_store(config.data_dir / "state.db")
     async with make_client() as client:
-        await run_forever(config, conn, client)
+        await run_forever(config, conn, client, Secrets.from_env())
 
 
 def run() -> None:

@@ -33,7 +33,7 @@ async def check_item(
     item_id: int,
     item: WatchItem,
     checked_at: str,
-) -> Status:
+) -> Observation:
     fetched = await fetch(client, item.url)
     found = None
     if fetched.status is FetchStatus.BLOCKED:
@@ -51,15 +51,13 @@ async def check_item(
             logger.info("ok: %s %.2f via %s", item.name, found.price, found.source)
         else:
             logger.warning("no price found: %s", item.name)
-    create_observation(
-        conn,
-        Observation(
-            item_id=item_id,
-            checked_at=checked_at,
-            status=status,
-            price=found.price if found else None,
-            currency=found.currency if found else None,
-            in_stock=found.in_stock if found else None,
-        ),
+    obs = Observation(
+        item_id=item_id,
+        checked_at=checked_at,
+        status=status,
+        price=found.price if found else None,
+        currency=found.currency if found else None,
+        in_stock=found.in_stock if found else None,
     )
-    return status
+    create_observation(conn, obs)
+    return obs

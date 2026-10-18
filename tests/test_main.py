@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 from datetime import datetime
@@ -5,7 +6,7 @@ from pathlib import Path
 
 import respx
 
-from wheel_n_deal.config import Config, load_config
+from wheel_n_deal.config import Config, Secrets, load_config
 from wheel_n_deal.fetch import make_client
 from wheel_n_deal.main import load_schedule, run_forever, sync_watch_list
 from wheel_n_deal.store import (
@@ -23,11 +24,15 @@ URL_B = "https://shop.example/products/b"
 HOUR = 3600
 
 
-def _config(tmp_path: Path, urls: list[str]) -> Config:
+HEARTBEAT = "https://status.example/api/push/token"
+
+
+def _config(tmp_path: Path, urls: list[str], target_price: float = 1) -> Config:
     return Config.model_validate(
         {
-            "watch": [{"url": url, "name": url[-1], "target_price": 1} for url in urls],
+            "watch": [{"url": url, "name": url[-1], "target_price": target_price} for url in urls],
             "ntfy": {"url": "https://ntfy.example"},
+            "heartbeat_url": HEARTBEAT,
             "llm": {"base_url": "https://llm.example/v1"},
             "politeness": {"min_interval_hours": 6, "jitter_minutes": 0},
             "data_dir": str(tmp_path),
@@ -49,7 +54,7 @@ def test_sync_watch_list_writes_every_item(tmp_path):
 
 
 async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
-    config = _config(tmp_path, [URL_A, URL_B])
+    config = _config(tmp_path, [URL_A, URL_B], target_price=200)
     conn = open_store(tmp_path / "state.db")
     now = [1_800_000_000.0]
     sleeps: list[float] = []
@@ -65,12 +70,15 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
     with respx.mock:
         respx.get(URL_A).respond(200, text=page)
         respx.get(URL_B).respond(429)
+        ntfy = respx.post("https://ntfy.example/").respond(200)
+        heartbeat = respx.get(HEARTBEAT).respond(200)
         async with make_client() as client:
             try:
                 await run_forever(
                     config,
                     conn,
                     client,
+                    Secrets(llm_api_key=None, ntfy_token="t"),
                     clock=lambda: now[0],
                     sleep=fake_sleep,
                     rng=random.Random(1),
@@ -84,6 +92,9 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
     assert statuses_a == [Status.OK, Status.OK]
     assert statuses_b == [Status.BLOCKED, Status.BLOCKED]
     assert caplog.text.count("run: checked=2 ok=1 blocked=1 failed=0") == 2
+    titles = sorted(json.loads(call.request.content)["title"] for call in ntfy.calls)
+    assert titles == ["1 item(s) blocked", "Price drop: a"]
+    assert heartbeat.call_count == 2
 
 
 def test_restart_respects_interval_since_last_check(tmp_path):

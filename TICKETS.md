@@ -8,20 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T6: ntfy alerts and heartbeat
-**Description:** Send one ntfy alert per drop below target and ping an optional heartbeat after each successful run.
-
-**Deliverables:**
-- [ ] `notify.py`: POST `{ntfy.url}/` JSON (`topic`, `title`, `message`, `click` = product URL, `actions` `[{"action":"view","label":"Open","url":…}]`, `tags`, `priority`), header `Authorization: Bearer $NTFY_TOKEN`
-- [ ] Alert state machine: fire once when price goes below target; re-arm only after price recovers above target; no repeats
-- [ ] Optional summary notice for items newly `blocked`
-- [ ] `heartbeat.py`: GET `heartbeat_url` (Uptime Kuma push) after each successful run; warn and continue on failure; never log the URL
-- [ ] Tests with respx for payload shape, auth header, single-fire/re-arm, heartbeat failure tolerance
-
-**Dependencies:** T5
-
----
-
 ### T7: MiMo extraction fallback
 **Description:** When structured extraction fails on a non-blocked page, ask MiMo to extract the price from a trimmed page view.
 
@@ -99,6 +85,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T6: ntfy alerts and heartbeat
+**Description:** Send one ntfy alert per drop below target and ping an optional heartbeat after each successful run.
+
+**Deliverables:**
+- [x] `notify.py`: POST `{ntfy.url}/` JSON (`topic`, `title`, `message`, `click` = product URL, `actions` `[{"action":"view","label":"Open","url":…}]`, `tags`, `priority`), header `Authorization: Bearer $NTFY_TOKEN`
+- [x] Alert state machine: fire once when price goes below target; re-arm only after price recovers above target; no repeats
+- [x] Optional summary notice for items newly `blocked`
+- [x] `heartbeat.py`: GET `heartbeat_url` (Uptime Kuma push) after each successful run; warn and continue on failure; never log the URL
+- [x] Tests with respx for payload shape, auth header, single-fire/re-arm, heartbeat failure tolerance
+
+**Dependencies:** T5
+
+---
 
 ### T5: Scheduler and run loop with per-site politeness
 **Description:** Run a long-lived asyncio scheduler that checks each watched item on a jittered per-site schedule and records results.

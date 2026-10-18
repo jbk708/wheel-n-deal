@@ -26,8 +26,9 @@ def conn(tmp_path):
 async def _check(client, conn, url: str) -> tuple[Status, list]:
     item = WatchItem(url=url, name="Thing", target_price=100)
     item_id = write_item(conn, item.url, item.name, item.target_price)
-    status = await check_item(client, conn, item_id, item, AT)
-    return status, read_observations(conn, item_id)
+    obs = await check_item(client, conn, item_id, item, AT)
+    assert [obs] == read_observations(conn, item_id)
+    return obs.status, [obs]
 
 
 async def test_ok_stores_price(client, conn):
