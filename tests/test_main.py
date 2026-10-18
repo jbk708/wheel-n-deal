@@ -1,9 +1,12 @@
 import json
 import logging
 import random
+import sqlite3
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+import httpx
 import respx
 
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
@@ -86,13 +89,14 @@ async def test_run_forever_checks_items_from_the_database(tmp_path):
 async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
     config = _config(tmp_path, [URL_A, URL_B], target_price=200)
     conn = open_store(tmp_path / "state.db")
-    now = [1_800_000_000.0]
+    start = 1_800_000_000.0
+    now = [start]
     sleeps: list[float] = []
 
     async def fake_sleep(seconds: float) -> None:
-        sleeps.append(seconds)
-        if len(sleeps) == 2:
+        if now[0] >= start + 6 * HOUR:
             raise _Stop
+        sleeps.append(seconds)
         now[0] += seconds
 
     page = (ROOT / "tests" / "fixtures" / "jsonld_product.html").read_text()
@@ -116,7 +120,7 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
             except _Stop:
                 pass
 
-    assert sleeps[0] == 6 * HOUR
+    assert set(sleeps) == {60} and len(sleeps) == 6 * 60
     statuses_a = [o.status for o in read_observations(conn, read_item_id(conn, URL_A))]
     statuses_b = [o.status for o in read_observations(conn, read_item_id(conn, URL_B))]
     assert statuses_a == [Status.OK, Status.OK]
@@ -125,6 +129,75 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
     titles = sorted(json.loads(call.request.content)["title"] for call in ntfy.calls)
     assert titles == ["1 item(s) blocked", "Price drop: a"]
     assert heartbeat.call_count == 2
+
+
+URL_OTHER_SITE = "https://other.example/products/c"
+
+
+async def _run_with_changes(
+    tmp_path: Path, changes: dict[float, Callable], until: float
+) -> tuple[sqlite3.Connection, dict[str, list[float]]]:
+    """Run the loop on a fake clock, applying each change once its time (hours) is reached."""
+    config = _config(tmp_path, [URL_A])
+    conn = open_store(tmp_path / "state.db")
+    start = 1_800_000_000.0
+    now = [start]
+    checked: dict[str, list[float]] = {}
+    pending = dict(sorted(changes.items()))
+
+    async def fake_sleep(seconds: float) -> None:
+        now[0] += seconds
+        for at in [at for at in pending if start + at * HOUR <= now[0]]:
+            pending.pop(at)(conn)
+        if now[0] >= start + until * HOUR:
+            raise _Stop
+
+    def record(request: httpx.Request) -> httpx.Response:
+        checked.setdefault(str(request.url), []).append((now[0] - start) / HOUR)
+        return httpx.Response(429)
+
+    with respx.mock:
+        respx.get(url__regex=r"https://(shop|other)\.example/.*").mock(side_effect=record)
+        respx.post("https://ntfy.example/").respond(200)
+        respx.get(HEARTBEAT).respond(200)
+        async with make_client() as client:
+            try:
+                await run_forever(
+                    config,
+                    conn,
+                    client,
+                    Secrets(None, "t"),
+                    clock=lambda: now[0],
+                    sleep=fake_sleep,
+                    rng=random.Random(1),
+                )
+            except _Stop:
+                pass
+    return conn, checked
+
+
+def _add(url: str) -> Callable:
+    return lambda conn: create_item(conn, WatchItem(url=url, name=url[-1], target_price=1))
+
+
+async def test_item_on_new_site_is_checked_within_a_minute(tmp_path):
+    _, checked = await _run_with_changes(tmp_path, {1: _add(URL_OTHER_SITE)}, until=2)
+    assert len(checked[URL_OTHER_SITE]) == 1
+    assert 1 <= checked[URL_OTHER_SITE][0] <= 1 + 1 / 60
+
+
+async def test_item_on_known_site_joins_the_sites_next_slot(tmp_path):
+    _, checked = await _run_with_changes(tmp_path, {1: _add(URL_B)}, until=6.5)
+    assert checked[URL_A] == [0, 6]
+    assert checked[URL_B] == [6]
+
+
+async def test_removed_item_is_no_longer_checked(tmp_path):
+    def remove_a(conn: sqlite3.Connection) -> None:
+        delete_item(conn, read_item_id(conn, URL_A), "2026-10-18T00:00:00+00:00")
+
+    _, checked = await _run_with_changes(tmp_path, {1: remove_a}, until=13)
+    assert checked[URL_A] == [0]
 
 
 def test_restart_respects_interval_since_last_check(tmp_path):

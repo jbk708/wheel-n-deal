@@ -61,6 +61,8 @@ Unknown keys are rejected.
 
 **The watch list lives in `state.db`.** On every start, `watch:` URLs that the database has never seen are imported; nothing else in `watch:` is read. Editing or deleting an entry in `config.yaml` does not change an item that is already in the database, and a removed item stays removed even if its URL is still in `watch:`. Databases from before this change are migrated in place and keep their items and history.
 
+The run loop re-reads the watch list every minute, so items added or removed at runtime apply without a restart. A new item on a site that is not watched yet is checked within a minute; a new item on a site that is already watched waits for that site's next slot, so the politeness interval still holds.
+
 **`.env`** holds secrets. Copy it from [`.env.example`](.env.example):
 
 | Variable | Used for |
