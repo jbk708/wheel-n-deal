@@ -1,9 +1,9 @@
 # wheel-n-deal
 
-A personal price tracker. You list products in `config.yaml` with a target price. One long-lived container checks each product every few hours over plain HTTP, records the price in SQLite, and sends an [ntfy](https://ntfy.sh) notification when a price drops below your target.
+A personal price tracker. You keep a watch list of products with target prices. One long-lived container checks each product every few hours over plain HTTP, records the price in SQLite, and sends an [ntfy](https://ntfy.sh) notification when a price drops below your target.
 
 ```
-config.yaml watch list
+watch list in SQLite (seeded once from config.yaml)
   → polite fetch (httpx, honest User-Agent, one request at a time per site)
   → structured extraction (JSON-LD, Shopify .js, meta tags, per-site selectors)
   → learned selector (saved from an earlier LLM answer)
@@ -43,6 +43,7 @@ Two files sit next to the container. Neither is committed.
 
 | Key | Required | Default | Meaning |
 |---|---|---|---|
+| `watch` | no | `[]` | Seed for the watch list (see below). |
 | `watch[].url` | yes | | Product page URL (`http(s)://`). URLs must be unique. |
 | `watch[].name` | yes | | Name used in logs and notifications. |
 | `watch[].target_price` | yes | | Alert when the price drops below this (> 0). |
@@ -57,6 +58,8 @@ Two files sit next to the container. Neither is committed.
 | `heartbeat_url` | no | | Uptime Kuma push URL, fetched with GET after each successful run. It is never logged. |
 
 Unknown keys are rejected.
+
+**The watch list lives in `state.db`.** On every start, `watch:` URLs that the database has never seen are imported; nothing else in `watch:` is read. Editing or deleting an entry in `config.yaml` does not change an item that is already in the database, and a removed item stays removed even if its URL is still in `watch:`. Databases from before this change are migrated in place and keep their items and history.
 
 **`.env`** holds secrets. Copy it from [`.env.example`](.env.example):
 

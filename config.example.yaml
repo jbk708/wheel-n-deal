@@ -1,5 +1,7 @@
 # Non-secret settings. Copy to config.yaml (gitignored) and edit.
 # Secrets come from .env only: LLM_API_KEY, NTFY_TOKEN.
+# watch: seeds the watch list in state.db. Only URLs the database has never seen are
+# imported on start; after that the database is the source of truth.
 watch:
   - url: https://shop.example/products/espresso-grinder
     name: Espresso grinder

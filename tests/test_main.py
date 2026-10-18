@@ -6,15 +6,18 @@ from pathlib import Path
 
 import respx
 
-from wheel_n_deal.config import Config, Secrets, load_config
+from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
 from wheel_n_deal.fetch import make_client
-from wheel_n_deal.main import load_schedule, run_forever, sync_watch_list, touch_heartbeat
+from wheel_n_deal.main import load_schedule, run_forever, seed_watch_list, touch_heartbeat
 from wheel_n_deal.store import (
     Observation,
     Status,
+    create_item,
     create_observation,
+    delete_item,
     open_store,
     read_item_id,
+    read_items,
     read_observations,
 )
 
@@ -44,13 +47,40 @@ class _Stop(Exception):
     pass
 
 
-def test_sync_watch_list_writes_every_item(tmp_path):
+def test_seed_watch_list_imports_every_item_once(tmp_path):
     config = load_config(ROOT / "config.example.yaml")
     conn = open_store(tmp_path / "state.db")
-    ids = sync_watch_list(conn, config)
-    assert len(ids) == len(config.watch)
-    for item in config.watch:
-        assert read_item_id(conn, item.url) == ids[item.url]
+    seed_watch_list(conn, config)
+    first = read_items(conn)
+    assert sorted(first.values(), key=lambda i: i.url) == sorted(config.watch, key=lambda i: i.url)
+    delete_item(conn, read_item_id(conn, config.watch[0].url), "2026-10-18T00:00:00+00:00")
+    seed_watch_list(conn, config)
+    assert config.watch[0] not in read_items(conn).values()
+    assert len(read_items(conn)) == len(config.watch) - 1
+
+
+async def test_run_forever_checks_items_from_the_database(tmp_path):
+    config = _config(tmp_path, [URL_A])
+    conn = open_store(tmp_path / "state.db")
+    seed_watch_list(conn, config)
+    delete_item(conn, read_item_id(conn, URL_A), "2026-10-18T00:00:00+00:00")
+    create_item(conn, WatchItem(url=URL_B, name="b", target_price=1))
+
+    async def stop(seconds: float) -> None:
+        raise _Stop
+
+    with respx.mock:
+        a = respx.get(URL_A).respond(200, text="<title>a</title>")
+        b = respx.get(URL_B).respond(429)
+        respx.post("https://ntfy.example/").respond(200)
+        respx.get(HEARTBEAT).respond(200)
+        async with make_client() as client:
+            try:
+                await run_forever(config, conn, client, Secrets(None, "t"), sleep=stop)
+            except _Stop:
+                pass
+    assert a.call_count == 0
+    assert b.call_count == 1
 
 
 async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
@@ -100,11 +130,13 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
 def test_restart_respects_interval_since_last_check(tmp_path):
     config = _config(tmp_path, [URL_A, URL_B])
     conn = open_store(tmp_path / "state.db")
-    ids = sync_watch_list(conn, config)
-    obs = Observation(ids[URL_A], "2026-10-18T10:00:00+00:00", Status.OK, 1.0, "USD", True)
+    seed_watch_list(conn, config)
+    obs = Observation(
+        read_item_id(conn, URL_A), "2026-10-18T10:00:00+00:00", Status.OK, 1.0, "USD", True
+    )
     create_observation(conn, obs)
     now = datetime.fromisoformat("2026-10-18T12:00:00+00:00").timestamp()
-    schedule = load_schedule(conn, config, ids, now, random.Random())
+    schedule = load_schedule(conn, read_items(conn), now, 6 * HOUR, 0, random.Random())
     assert schedule == {"shop.example": now + 4 * HOUR}
 
 

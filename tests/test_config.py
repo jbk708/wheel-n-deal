@@ -37,6 +37,14 @@ def test_notes_optional_and_loaded(tmp_path):
     assert any(item.notes for item in config.watch)
 
 
+def test_watch_is_optional(tmp_path):
+    text = """
+ntfy: {url: https://ntfy.example}
+llm: {base_url: https://llm.example/v1}
+"""
+    assert load_config(_write(tmp_path, text)).watch == []
+
+
 def test_unknown_key_rejected(tmp_path):
     with pytest.raises(ValidationError):
         load_config(_write(tmp_path, _example() + "\nbogus: 1\n"))

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from wheel_n_deal.config import WatchItem
+
 
 class Status(StrEnum):
     OK = "ok"
@@ -17,7 +19,9 @@ _SCHEMA = [
         id INTEGER PRIMARY KEY,
         url TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
-        target_price REAL NOT NULL
+        target_price REAL NOT NULL,
+        notes TEXT,
+        removed_at TEXT
     )
     """,
     f"""
@@ -76,19 +80,63 @@ def open_store(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     for statement in _SCHEMA:
         conn.execute(statement)
+    _add_missing_item_columns(conn)
     conn.commit()
     return conn
 
 
-def write_item(conn: sqlite3.Connection, url: str, name: str, target_price: float) -> int:
-    (item_id,) = conn.execute(
-        "INSERT INTO items (url, name, target_price) VALUES (?, ?, ?)"
-        " ON CONFLICT(url) DO UPDATE SET name = excluded.name,"
-        " target_price = excluded.target_price RETURNING id",
-        (url, name, target_price),
-    ).fetchone()
+def _add_missing_item_columns(conn: sqlite3.Connection) -> None:
+    """Databases created before the watch list moved into SQLite lack these columns."""
+    have = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+    for column in ("notes", "removed_at"):
+        if column not in have:
+            conn.execute(f"ALTER TABLE items ADD COLUMN {column} TEXT")
+
+
+def seed_item(conn: sqlite3.Connection, item: WatchItem) -> None:
+    conn.execute(
+        "INSERT INTO items (url, name, target_price, notes) VALUES (?, ?, ?, ?)"
+        " ON CONFLICT(url) DO NOTHING",
+        (item.url, item.name, item.target_price, item.notes),
+    )
     conn.commit()
-    return item_id
+
+
+def create_item(conn: sqlite3.Connection, item: WatchItem) -> int | None:
+    """Insert a new item, or revive a removed one with the same URL; None if already active."""
+    row = conn.execute(
+        "INSERT INTO items (url, name, target_price, notes) VALUES (?, ?, ?, ?)"
+        " ON CONFLICT(url) DO UPDATE SET name = excluded.name,"
+        " target_price = excluded.target_price, notes = excluded.notes, removed_at = NULL"
+        " WHERE items.removed_at IS NOT NULL RETURNING id",
+        (item.url, item.name, item.target_price, item.notes),
+    ).fetchone()
+    if row is None:
+        conn.rollback()
+        return None
+    # A revived item starts with a fresh alert so a new target can fire.
+    conn.execute("DELETE FROM alert_state WHERE item_id = ?", row)
+    conn.commit()
+    return row[0]
+
+
+def read_items(conn: sqlite3.Connection) -> dict[int, WatchItem]:
+    rows = conn.execute(
+        "SELECT id, url, name, target_price, notes FROM items WHERE removed_at IS NULL ORDER BY id"
+    )
+    return {
+        row[0]: WatchItem(url=row[1], name=row[2], target_price=row[3], notes=row[4])
+        for row in rows
+    }
+
+
+def delete_item(conn: sqlite3.Connection, item_id: int, at: str) -> bool:
+    """Soft-remove: the row and its history stay, so the seed never re-imports the URL."""
+    removed = conn.execute(
+        "UPDATE items SET removed_at = ? WHERE id = ? AND removed_at IS NULL", (at, item_id)
+    ).rowcount
+    conn.commit()
+    return removed == 1
 
 
 def read_item_id(conn: sqlite3.Connection, url: str) -> int | None:
