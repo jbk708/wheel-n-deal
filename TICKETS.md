@@ -8,21 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T3: Polite HTTP fetch layer
-**Description:** Fetch product pages with plain httpx and an honest User-Agent, resolve short links, and classify blocked responses.
-
-**Deliverables:**
-- [ ] `fetch.py`: one shared `httpx.AsyncClient`, UA `wheel-n-deal/<version> (+personal price tracker)` (version from package metadata), sane timeout, follows redirects
-- [ ] Amazon short links (`a.co`, `amzn.to`) resolved to the canonical product URL before parsing
-- [ ] Costco new `/p/` URLs accepted
-- [ ] Block detection: 403/429/503, bot-wall / CAPTCHA markers, or empty body → `blocked` result (no retry loop)
-- [ ] No bot evasion: no stealth, rotating UAs, proxies, or CAPTCHA solving; no headless browser
-- [ ] Tests with respx (redirect resolution, blocked classification)
-
-**Dependencies:** T2
-
----
-
 ### T4: Structured price extraction
 **Description:** Extract price, currency, and stock from structured data before anything else, porting the useful legacy helpers.
 
@@ -142,6 +127,21 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T3: Polite HTTP fetch layer
+**Description:** Fetch product pages with plain httpx and an honest User-Agent, resolve short links, and classify blocked responses.
+
+**Deliverables:**
+- [x] `fetch.py`: one shared `httpx.AsyncClient`, UA `wheel-n-deal/<version> (+personal price tracker)` (version from package metadata), sane timeout, follows redirects
+- [x] Amazon short links (`a.co`, `amzn.to`) resolved to the canonical product URL before parsing
+- [x] Costco new `/p/` URLs accepted
+- [x] Block detection: 403/429/503, bot-wall / CAPTCHA markers, or empty body → `blocked` result (no retry loop)
+- [x] No bot evasion: no stealth, rotating UAs, proxies, or CAPTCHA solving; no headless browser
+- [x] Tests with respx (redirect resolution, blocked classification)
+
+**Dependencies:** T2
+
+---
 
 ### T2: Scaffold package, YAML config, and SQLite state
 **Description:** Create the root `src/wheel_n_deal/` package with pydantic config loaded from YAML and a SQLite store for price history and alert state.
