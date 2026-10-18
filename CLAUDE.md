@@ -51,7 +51,7 @@ The agents' placeholders are filled in for the rebuilt stack (uv, pytest, ruff, 
 
 ## Commands
 
-From the repo root (valid once the scaffold ticket lands; before that, legacy commands run from `backend/`):
+From the repo root (legacy `backend/` is excluded from these gates):
 
 ```sh
 uv sync                          # install

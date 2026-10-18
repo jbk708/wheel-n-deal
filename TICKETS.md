@@ -8,21 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T2: Scaffold package, YAML config, and SQLite state
-**Description:** Create the root `src/wheel_n_deal/` package with pydantic config loaded from YAML and a SQLite store for price history and alert state.
-
-**Deliverables:**
-- [ ] Root `pyproject.toml` replaced by the house layout (hatchling, `src/wheel_n_deal`, pinned httpx/pydantic/pyyaml, dev: pytest, pytest-asyncio, respx, ruff; script `wheel-n-deal`); `uv.lock` regenerated
-- [ ] `config.py`: watch list (`url`, `name`, `target_price`, optional `notes`), `ntfy` (`url`, `topic`), `llm` (`base_url`, `model`), optional `heartbeat_url`, politeness settings (per-site min interval hours, jitter); secrets only from env (`LLM_API_KEY`, `NTFY_TOKEN`)
-- [ ] `config.example.yaml` with placeholder URLs only; `.env.example` rewritten to just `LLM_API_KEY=` / `NTFY_TOKEN=`
-- [ ] `store.py` (sqlite3, path `/data/state.db` by default): items, price observations (price, currency, in_stock, status `ok|blocked|stale|error`, checked_at), per-item alert state (armed/fired)
-- [ ] Tests for config validation and store CRUD
-- [ ] CI switched to root gates (`uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`); legacy `backend/` excluded from ruff/pytest
-
-**Dependencies:** T1
-
----
-
 ### T3: Polite HTTP fetch layer
 **Description:** Fetch product pages with plain httpx and an honest User-Agent, resolve short links, and classify blocked responses.
 
@@ -157,6 +142,21 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T2: Scaffold package, YAML config, and SQLite state
+**Description:** Create the root `src/wheel_n_deal/` package with pydantic config loaded from YAML and a SQLite store for price history and alert state.
+
+**Deliverables:**
+- [x] Root `pyproject.toml` replaced by the house layout (hatchling, `src/wheel_n_deal`, pinned httpx/pydantic/pyyaml, dev: pytest, pytest-asyncio, respx, ruff; script `wheel-n-deal`); `uv.lock` regenerated
+- [x] `config.py`: watch list (`url`, `name`, `target_price`, optional `notes`), `ntfy` (`url`, `topic`), `llm` (`base_url`, `model`), optional `heartbeat_url`, politeness settings (per-site min interval hours, jitter); secrets only from env (`LLM_API_KEY`, `NTFY_TOKEN`)
+- [x] `config.example.yaml` with placeholder URLs only; `.env.example` rewritten to just `LLM_API_KEY=` / `NTFY_TOKEN=`
+- [x] `store.py` (sqlite3, path `/data/state.db` by default): items, price observations (price, currency, in_stock, status `ok|blocked|stale|error`, checked_at), per-item alert state (armed/fired)
+- [x] Tests for config validation and store CRUD
+- [x] CI switched to root gates (`uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`); legacy `backend/` excluded from ruff/pytest
+
+**Dependencies:** T1
+
+---
 
 ### T1: Fix CI and repo hygiene
 **Description:** Make CI run on Python 3.12 so PRs can go green, and stop tracking databases and other private files in this public repo.

@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,33 +19,13 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        working-directory: backend
-        run: uv sync
+        run: uv sync --locked
 
       - name: Ruff lint
-        working-directory: backend
         run: uv run ruff check .
 
       - name: Ruff format
-        working-directory: backend
         run: uv run ruff format --check .
 
-  test:
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        working-directory: backend
-        run: uv sync
-
-      - name: Run tests
-        working-directory: backend
+      - name: Tests
         run: uv run pytest

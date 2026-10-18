@@ -1,0 +1,22 @@
+# Non-secret settings. Copy to config.yaml (gitignored) and edit.
+# Secrets come from .env only: LLM_API_KEY, NTFY_TOKEN.
+watch:
+  - url: https://shop.example/products/espresso-grinder
+    name: Espresso grinder
+    target_price: 149.99
+  - url: https://store.example/p/noise-cancelling-headphones
+    name: Noise-cancelling headphones
+    target_price: 199.00
+    notes: Any colour is fine
+ntfy:
+  url: https://ntfy.example
+  topic: deals
+llm:
+  base_url: https://llm.example/api/v1
+  model: mimo-v2.6-flash
+politeness:
+  min_interval_hours: 6 # never check the same site more often than this
+  jitter_minutes: 30 # random delay added to each site's schedule
+data_dir: /data # container bind mount; holds state.db
+# Optional: Uptime Kuma push URL, pinged (GET) after each successful run.
+# heartbeat_url: https://status.example/api/push/<token>?status=up&msg=OK&ping=
