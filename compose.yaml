@@ -1,0 +1,20 @@
+services:
+  wheel-n-deal:
+    build:
+      context: .
+      args:
+        APP_UID: "${APP_UID:-1000}"
+        APP_GID: "${APP_GID:-1000}"
+    # Outbound only (shops, MiMo, ntfy over Tailscale); nothing listens, so no ports.
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 512m
+    env_file: .env
+    environment:
+      - TZ=${TZ:-America/Los_Angeles}
+    volumes:
+      # ./config.yaml and ./data must exist and be owned by APP_UID:APP_GID
+      # before the first `up`: Docker creates missing bind mounts as root (a
+      # missing file as a directory), which the non-root user can't use.
+      - ./config.yaml:/config/config.yaml:ro
+      - ./data:/data

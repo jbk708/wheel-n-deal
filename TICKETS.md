@@ -8,19 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T10: Container and deploy script
-**Description:** Package the service as one small container and deploy it to duckling2 with the house git-archive release script.
-
-**Deliverables:**
-- [ ] `Dockerfile` (python:3.12-slim + uv, non-root uid 1000, no browser), healthcheck on a heartbeat file in `/data`
-- [ ] `compose.yaml`: host networking, no published ports, `mem_limit: 512m`, `env_file: .env`, `./config.yaml` and `./data` mounted, `restart: unless-stopped`
-- [ ] `scripts/deploy.sh <host> [<tag>]`: git archive over ssh into `~/wheel-n-deal/releases/<tag>`, `compose up --build --wait`, repoint `current` symlink on health; rollback = deploy an older tag; never touches remote `.env`/`config.yaml`/`data/`
-- [ ] shellcheck clean; CI runs shellcheck and a `docker build`
-
-**Dependencies:** T9
-
----
-
 ### T11: README and docs rewrite
 **Description:** Document the rebuilt service for a new reader: what it does, config, run, deploy.
 
@@ -46,6 +33,19 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T10: Container and deploy script
+**Description:** Package the service as one small container and deploy it to duckling2 with the house git-archive release script.
+
+**Deliverables:**
+- [x] `Dockerfile` (python:3.12-slim + uv, non-root uid 1000, no browser), healthcheck on a heartbeat file in `/data`
+- [x] `compose.yaml`: host networking, no published ports, `mem_limit: 512m`, `env_file: .env`, `./config.yaml` and `./data` mounted, `restart: unless-stopped`
+- [x] `scripts/deploy.sh <host> [<tag>]`: git archive over ssh into `~/wheel-n-deal/releases/<tag>`, `compose up --build --wait`, repoint `current` symlink on health; rollback = deploy an older tag; never touches remote `.env`/`config.yaml`/`data/`
+- [x] shellcheck clean; CI runs shellcheck and a `docker build`
+
+**Dependencies:** T9
+
+---
 
 ### T9: Deal verdict
 **Description:** On a new below-target alert, optionally ask MiMo once whether it is a real deal and include the verdict in the notification.

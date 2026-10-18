@@ -8,7 +8,7 @@ import respx
 
 from wheel_n_deal.config import Config, Secrets, load_config
 from wheel_n_deal.fetch import make_client
-from wheel_n_deal.main import load_schedule, run_forever, sync_watch_list
+from wheel_n_deal.main import load_schedule, run_forever, sync_watch_list, touch_heartbeat
 from wheel_n_deal.store import (
     Observation,
     Status,
@@ -133,3 +133,20 @@ async def test_price_drop_alert_carries_mimo_verdict(tmp_path):
     assert llm.call_count == 1
     message = json.loads(ntfy.calls.last.request.content)["message"]
     assert message.endswith("Verdict: real deal. Lowest price seen.")
+
+
+async def test_heartbeat_file_is_touched_repeatedly(tmp_path):
+    path = tmp_path / "heartbeat"
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        path.unlink()
+        if len(sleeps) == 2:
+            raise _Stop
+
+    try:
+        await touch_heartbeat(path, sleep=fake_sleep)
+    except _Stop:
+        pass
+    assert sleeps == [30, 30]

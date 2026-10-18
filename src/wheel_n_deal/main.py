@@ -1,3 +1,9 @@
+"""Entry point: a long-lived process with an internal per-site scheduler.
+
+A heartbeat file is touched on its own task so the Docker HEALTHCHECK can tell a live event
+loop from a wedged one, even during the hours between checks.
+"""
+
 import argparse
 import asyncio
 import logging
@@ -6,6 +12,7 @@ import sqlite3
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 
@@ -26,6 +33,8 @@ from wheel_n_deal.scheduler import (
 from wheel_n_deal.store import Status, open_store, read_observations, write_item
 
 logger = logging.getLogger(__name__)
+
+_HEARTBEAT_SECONDS = 30
 
 
 def sync_watch_list(conn: sqlite3.Connection, config: Config) -> dict[str, int]:
@@ -117,10 +126,21 @@ async def run_forever(
         await sleep(max(0.0, min(schedule.values(), default=clock() + interval_s) - clock()))
 
 
+async def touch_heartbeat(
+    path: Path, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> None:
+    while True:
+        path.touch()
+        await sleep(_HEARTBEAT_SECONDS)
+
+
 async def _main(config: Config) -> None:
     conn = open_store(config.data_dir / "state.db")
     async with make_client() as client:
-        await run_forever(config, conn, client, Secrets.from_env())
+        await asyncio.gather(
+            touch_heartbeat(config.data_dir / "heartbeat"),
+            run_forever(config, conn, client, Secrets.from_env()),
+        )
 
 
 def run() -> None:
