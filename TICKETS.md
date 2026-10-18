@@ -19,6 +19,8 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 **Dependencies:** none (blocked on owner approval)
 
+---
+
 ### T15: SQLite owns the watch list
 **Description:** The watch list lives in the database so it can be changed at runtime. `config.yaml` `watch:` becomes a one-time seed: on start, only URLs the database has never seen are imported; items already in the database (including soft-removed ones) are left alone. Existing deployments keep their items and history.
 
