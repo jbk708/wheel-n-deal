@@ -1,6 +1,6 @@
 import pytest
 
-from wheel_n_deal.learned import derive_selector, read_price
+from wheel_n_deal.learned import derive_selector, price_on_page, read_price
 
 NESTED = (
     "<html><body><div class='recs'><span>$9.99</span></div>"
@@ -72,3 +72,19 @@ def test_no_evidence_derives_nothing():
 )
 def test_broken_selector_reads_nothing(selector):
     assert read_price(NESTED + JSON_LD, selector) is None
+
+
+@pytest.mark.parametrize(
+    ("html", "price", "found"),
+    [
+        ("<p>Now $87.00</p>", 87.0, True),
+        ("<p>Now $1,299.99</p>", 1299.99, True),
+        ('<meta property="product:price:amount" content="42">', 42.0, True),
+        ('<script>{"price": "19.5"}</script>', 19.5, True),
+        ("<p>Now $87.00</p>", 12.0, False),
+        ("<p>Now $87.00</p>", 8.7, False),
+        ("<p>No price here</p>", 87.0, False),
+    ],
+)
+def test_price_on_page(html, price, found):
+    assert price_on_page(html, price) is found

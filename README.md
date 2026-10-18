@@ -121,7 +121,7 @@ Each run logs one summary line (`checked / ok / blocked / failed`), plus one lin
 
 Do not lower `min_interval_hours` to "try harder". Checking more often makes blocks more likely.
 
-**Observations are `stale`.** The page was fetched, but structured extraction failed and the LLM could not be reached or gave an invalid answer. The last known price is kept and marked `stale`, and nothing crashes. The LLM endpoint can be down for hours. Checks resume normally once it is back. If an item is stale on every run, look for `MiMo skipped: LLM_API_KEY is not set` or LLM HTTP errors in the logs.
+**Observations are `stale`.** The page was fetched, but structured extraction failed and the LLM could not be reached, gave an invalid answer, or reported a price that does not appear anywhere on the page (no alert is sent for an unverified price). The last known price is kept and marked `stale`, and nothing crashes. The LLM endpoint can be down for hours. Checks resume normally once it is back. If an item is stale on every run, look for `MiMo skipped: LLM_API_KEY is not set`, `not on page`, or LLM HTTP errors in the logs.
 
 **Status is `error`.** The fetch failed (DNS, timeout, connection), or the page loaded but no price was found anywhere. If that happens on every run for one item, the URL is probably wrong or the product is gone.
 

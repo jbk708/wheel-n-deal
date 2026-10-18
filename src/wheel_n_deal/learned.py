@@ -15,6 +15,7 @@ from wheel_n_deal.extract import parse_price
 _SAFE_ID = re.compile(r"^[A-Za-z][\w-]*$")
 _SAFE_TAG = re.compile(r"^[a-z][a-z0-9-]*$")
 _SKIP_TAGS = ("script", "style", "noscript", "template", "head", "title")
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
 def _normalized(tag: Tag) -> str:
@@ -117,3 +118,11 @@ def derive_selector(html: str, price: float, evidence: str | None) -> str | None
         if _read_price(soup, selector) == price:
             return selector
     return None
+
+
+def price_on_page(html: str, price: float) -> bool:
+    """True if `price` appears anywhere in the raw page (text, attributes, JSON-LD, scripts)."""
+    return any(
+        round(float(match.replace(",", "")), 2) == round(price, 2)
+        for match in _NUMBER.findall(html)
+    )

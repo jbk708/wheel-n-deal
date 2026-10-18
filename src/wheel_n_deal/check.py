@@ -7,7 +7,7 @@ import httpx
 from wheel_n_deal.config import WatchItem
 from wheel_n_deal.extract import Extraction, extract, extract_shopify_js, shopify_js_url
 from wheel_n_deal.fetch import FetchResult, FetchStatus, fetch
-from wheel_n_deal.learned import derive_selector, read_price
+from wheel_n_deal.learned import derive_selector, price_on_page, read_price
 from wheel_n_deal.llm import MiMo
 from wheel_n_deal.store import (
     Observation,
@@ -51,6 +51,13 @@ def _read_learned(
     return None
 
 
+def _last_known(conn: sqlite3.Connection, item_id: int) -> tuple[Status, Extraction | None]:
+    last = read_last_priced(conn, item_id)
+    if not last:
+        return Status.STALE, None
+    return Status.STALE, Extraction(last.price, last.currency, last.in_stock, "last-known")
+
+
 async def _read_with_mimo(
     conn: sqlite3.Connection,
     mimo: MiMo,
@@ -61,11 +68,8 @@ async def _read_with_mimo(
 ) -> tuple[Status, Extraction | None]:
     answer = await mimo.extract(page.url, page.body)
     if answer is None:
-        last = read_last_priced(conn, item_id)
         logger.warning("stale: %s (MiMo unavailable, keeping last known price)", item.name)
-        if not last:
-            return Status.STALE, None
-        return Status.STALE, Extraction(last.price, last.currency, last.in_stock, "last-known")
+        return _last_known(conn, item_id)
     if answer.blocked:
         logger.warning("blocked: %s (MiMo saw a bot wall)", item.name)
         return Status.BLOCKED, None
@@ -75,6 +79,14 @@ async def _read_with_mimo(
     selector = derive_selector(page.body, answer.price, answer.evidence)
     if selector:
         write_selector(conn, item_id, selector, checked_at)
+    elif not price_on_page(page.body, answer.price):
+        # Never alert on a price the page does not show (hallucinated or wrong product).
+        logger.warning(
+            "stale: %s (MiMo price %.2f not on page, keeping last known price)",
+            item.name,
+            answer.price,
+        )
+        return _last_known(conn, item_id)
     logger.info("ok: %s %.2f via mimo (learned: %s)", item.name, answer.price, selector)
     return Status.OK, Extraction(answer.price, answer.currency, answer.in_stock, "mimo")
 

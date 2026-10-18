@@ -14,6 +14,19 @@ _None._
 
 ## Done
 
+### T13: Verify MiMo prices against the page
+**Description:** A MiMo price that cannot be found on the fetched page must not count as a real observation, so a hallucinated or wrong-product price can never fire a price-drop alert and disarm the item.
+
+**Deliverables:**
+- [x] `learned.price_on_page`: plain search of the raw page (text, attributes, JSON-LD, scripts) for the price
+- [x] `check._read_with_mimo`: when neither the learned-selector check nor the plain search finds MiMo's price, record `stale` with the last known price (no alert)
+- [x] Tests: unverified price is stale (with and without history), price only in a script is still `ok` without a saved selector, `price_on_page` cases
+- [x] README troubleshooting updated
+
+**Dependencies:** T7, T8
+
+---
+
 ### T12: Retire legacy services
 **Description:** Delete the old stack now that the rebuild is live.
 

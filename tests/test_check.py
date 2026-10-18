@@ -195,7 +195,8 @@ async def test_shopify_js_bad_json_falls_back_to_mimo(client, conn):
         llm = respx.post(COMPLETIONS).respond(200, json=_llm_answer())
         status, _ = await _check(client, conn, url)
     assert llm.call_count == 1
-    assert status is Status.OK
+    # The fixture page shows no price at all, so MiMo's answer cannot be verified.
+    assert status is Status.STALE
 
 
 LEARNABLE_PAGE = "<html><body><h1>Grinder</h1><div id='buy'><b>Now $87.00</b></div></body></html>"
@@ -227,14 +228,38 @@ async def test_learned_selector_skips_mimo_until_it_breaks(client, conn):
     )
 
 
-async def test_price_not_on_page_saves_no_selector(client, conn):
+async def test_price_only_in_script_is_ok_but_saves_no_selector(client, conn):
+    url = "https://shop.example/products/grinder"
+    page = "<title>Grinder</title><h1>Grinder</h1><script>window.price = 85.00;</script>"
+    with respx.mock:
+        respx.get(url).respond(200, text=page)
+        respx.post(COMPLETIONS).respond(200, json=_llm_answer(price=85.0, evidence="$85"))
+        status, [obs] = await _check(client, conn, url)
+    assert status is Status.OK
+    assert obs.price == 85.0
+    assert read_selector(conn, 1) is None
+
+
+async def test_mimo_price_not_on_page_is_stale_and_keeps_last_known(client, conn):
+    url = "https://shop.example/products/grinder"
+    earlier = Observation(1, "2026-10-17T12:00:00+00:00", Status.OK, 87.0, "USD", True)
+    with respx.mock:
+        respx.get(url).respond(200, text=NO_PRICE_PAGE)
+        respx.post(COMPLETIONS).respond(200, json=_llm_answer(price=12.0, evidence="$12"))
+        status, [obs] = await _check(client, conn, url, [earlier])
+    assert status is Status.STALE
+    assert obs.price == 87.0
+    assert read_selector(conn, 1) is None
+
+
+async def test_mimo_price_not_on_page_without_history_is_stale_without_price(client, conn):
     url = "https://shop.example/products/grinder"
     with respx.mock:
         respx.get(url).respond(200, text=NO_PRICE_PAGE)
-        respx.post(COMPLETIONS).respond(200, json=_llm_answer(price=85.0, evidence="$85"))
-        status, _ = await _check(client, conn, url)
-    assert status is Status.OK
-    assert read_selector(conn, 1) is None
+        respx.post(COMPLETIONS).respond(200, json=_llm_answer(price=12.0, evidence="$12"))
+        status, [obs] = await _check(client, conn, url)
+    assert status is Status.STALE
+    assert obs.price is None
 
 
 async def test_broken_selector_with_mimo_down_is_dropped_and_stale(client, conn):
