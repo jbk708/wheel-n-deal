@@ -19,6 +19,47 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 **Dependencies:** none (blocked on owner approval)
 
+### T15: SQLite owns the watch list
+**Description:** The watch list lives in the database so it can be changed at runtime. `config.yaml` `watch:` becomes a one-time seed: on start, only URLs the database has never seen are imported; items already in the database (including soft-removed ones) are left alone. Existing deployments keep their items and history.
+
+**Deliverables:**
+- [ ] Schema migration: `items` gains `notes` and `removed_at` (in-place `ALTER TABLE`, existing rows and observations kept)
+- [ ] `watch:` optional in config; seed inserts unseen URLs only, never edits or revives existing rows
+- [ ] Store functions: read active items, create (or revive a removed URL), soft-remove
+- [ ] The scheduler checks the active items from the database, not from config
+- [ ] Tests: migration of a pre-T15 database, seed skips seen and removed URLs, create/revive/remove
+
+**Dependencies:** none
+
+---
+
+### T16: Scheduler picks up added and removed items without restart
+**Description:** Items added or removed at runtime (by the local API) are scheduled or dropped without restarting the container, while keeping the per-site politeness interval.
+
+**Deliverables:**
+- [ ] Run loop re-reads active items at least once a minute
+- [ ] New site: checked on the next wake-up (or after its interval, if it was checked recently); new item on a known site: joins that site's next slot; removed items stop being checked
+- [ ] Tests: add and remove items while the loop is running
+
+**Dependencies:** T15
+
+---
+
+### T17: Local HTTP API
+**Description:** A small HTTP API in the same process so a local assistant can list, add and remove watched items and read price history. Standard library only, bound to `127.0.0.1:8090`, bearer token from `WND_API_TOKEN`.
+
+**Deliverables:**
+- [ ] `GET /healthz` → 200 `{"ok": true}` (no auth)
+- [ ] `GET /items` → active items with latest price, currency, stock, last check time and status
+- [ ] `POST /items` `{url, name, target_price, notes?}` → 201 item; 409 if the URL is already watched; 400 on invalid input
+- [ ] `DELETE /items/{id}` → 204 (soft-remove); 404 if unknown or already removed
+- [ ] `GET /items/{id}/history?limit=N` (default 30) → observations, newest first
+- [ ] Every route except `/healthz` requires `Authorization: Bearer $WND_API_TOKEN` (constant-time compare); token unset → API disabled with a warning, price checks keep running
+- [ ] `.env.example`, compose comment, README API section
+- [ ] Tests for every route, auth, and error cases
+
+**Dependencies:** T15, T16
+
 ---
 
 ## Done
