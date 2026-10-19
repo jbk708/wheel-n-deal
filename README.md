@@ -25,7 +25,7 @@ Some large retailers will block it. That is expected, and the troubleshooting se
 
 ## How a price is found
 
-1. **Fetch.** Amazon short links (`a.co`, `amzn.to`) are resolved to the canonical `/dp/<ASIN>` URL first. Redirects are followed.
+1. **Fetch.** Amazon short links (`a.co`, `amzn.to`) are resolved to the canonical `https://www.amazon.com/dp/<ASIN>` URL first (with `GET`, stopping at the redirect). Redirects are followed.
 2. **Structured data.** JSON-LD `Product` offers, JSON-LD `ProductGroup` / `hasVariant` (the variant is chosen from `skuId`, `sku` or `variant` in the URL), the Shopify `/products/<handle>.js` endpoint, and price meta tags (`product:price:amount`, `og:price:amount`, `itemprop="price"`).
 3. **Per-site selectors** for Amazon, Walmart, Best Buy, Target, eBay, Sephora and Costco.
 4. **Learned selector.** A CSS path or JSON-LD key saved from an earlier LLM answer. It is checked against the live page before it is saved. If it stops matching, it is dropped and the LLM is asked once more.
@@ -79,9 +79,11 @@ The same process serves a small JSON API on `127.0.0.1:8090` (loopback only, nev
 |---|---|
 | `GET /healthz` | 200 `{"ok": true}`, no auth. |
 | `GET /items` | Active items: `id`, `name`, `url`, `target_price`, `notes`, `last_price`, `currency`, `in_stock`, `last_checked`, `last_status` (`ok`/`blocked`/`stale`/`error`, or null before the first check). The price, currency and stock come from the last check that found a price. |
-| `POST /items` | Body `{"url", "name", "target_price", "notes"?}`. 201 with the new item; 409 if the URL is already watched; 400 if the body is invalid. Adding a URL that was removed earlier brings it back with its history. |
+| `POST /items` | Body `{"url", "name", "target_price", "notes"?}`. 201 with the new item; 409 if the URL is already watched; 400 if the body is invalid; 502 if a short link could not be resolved. Amazon URLs are stored in canonical form (short links resolved, `https://www.amazon.com/dp/<ASIN>`, no tracking parameters), so the same product cannot be added twice. Adding a URL that was removed earlier brings it back with its history. The config seed canonicalizes URLs the same way. |
 | `DELETE /items/{id}` | 204. Stops watching the item; its history is kept. 404 if there is no such active item. |
 | `GET /items/{id}/history?limit=N` | Observations newest first (`checked_at`, `status`, `price`, `currency`, `in_stock`), default 30. |
+
+Add `detail=1` to `GET /items` or the history route for diagnostic fields: `last_http_status` and `last_block_reason` on items (from the latest check), `http_status` and `block_reason` on observations. The reason is short, e.g. `http 403`, `bot wall (validatecaptcha)` or `MiMo unavailable`. These fields are opt-in so clients that validate the original shape strictly keep working.
 
 ```sh
 curl -s -H "Authorization: Bearer $WND_API_TOKEN" http://127.0.0.1:8090/items
@@ -155,7 +157,7 @@ Do not lower `min_interval_hours` to "try harder". Checking more often makes blo
 
 ```sh
 sqlite3 -readonly ~/wheel-n-deal/data/state.db \
-  "SELECT i.name, o.checked_at, o.status, o.price FROM observations o JOIN items i ON i.id = o.item_id ORDER BY o.checked_at DESC LIMIT 20"
+  "SELECT i.name, o.checked_at, o.status, o.price, o.http_status, o.block_reason FROM observations o JOIN items i ON i.id = o.item_id ORDER BY o.checked_at DESC LIMIT 20"
 ```
 
 ## License

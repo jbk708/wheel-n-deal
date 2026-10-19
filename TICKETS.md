@@ -8,21 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T18: Block detection, short links and block reasons
-**Description:** Amazon's CAPTCHA page now posts to `/errors_page/validateCaptcha`, which the bot-wall markers miss, so it reaches MiMo instead of being recorded as blocked. `a.co` answers `HEAD` with 404, so short links never resolve, and items are stored under the short link, so the same product can be added twice. Observations don't say why a check was blocked.
-
-**Deliverables:**
-- [ ] Case-insensitive `validatecaptcha` bot-wall marker
-- [ ] Short links resolve with `GET` (no automatic redirects, up to 5 hops)
-- [ ] URLs are canonicalized when added (`POST /items` and the config seed): short links resolved, Amazon product URLs reduced to `https://www.amazon.com/dp/<ASIN>` without tracking parameters
-- [ ] Schema migration (in place): observations gain `http_status` and `block_reason`
-- [ ] `GET /items` gains optional `last_http_status` and `last_block_reason`; history entries gain `http_status` and `block_reason`; existing fields unchanged
-- [ ] Tests for each of the above
-
-**Dependencies:** none
-
----
-
 ### T19: Browser-like fetching with a headless fallback
 **Description:** Some shops (Sephora behind Akamai, Amazon) refuse a request that announces itself as a bot. Fetch with a current desktop Chrome User-Agent and matching browser headers. If a page is still blocked (403, 429, 503 or a bot wall), retry that one item once with headless Chromium (Playwright) and extract from the rendered HTML through the same pipeline. No CAPTCHA solving. Per-site spacing and jitter are unchanged.
 
@@ -68,6 +53,21 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T18: Block detection, short links and block reasons
+**Description:** Amazon's CAPTCHA page now posts to `/errors_page/validateCaptcha`, which the bot-wall markers miss, so it reaches MiMo instead of being recorded as blocked. `a.co` answers `HEAD` with 404, so short links never resolve, and items are stored under the short link, so the same product can be added twice. Observations don't say why a check was blocked.
+
+**Deliverables:**
+- [x] Case-insensitive `validatecaptcha` bot-wall marker
+- [x] Short links resolve with `GET` (no automatic redirects, up to 5 hops)
+- [x] URLs are canonicalized when added (`POST /items` and the config seed): short links resolved, Amazon product URLs reduced to `https://www.amazon.com/dp/<ASIN>` without tracking parameters
+- [x] Schema migration (in place): observations gain `http_status` and `block_reason`
+- [x] `GET /items?detail=1` adds `last_http_status` and `last_block_reason`; `history?detail=1` adds `http_status` and `block_reason`; the default shape is unchanged (a strict client rejects unknown keys)
+- [x] Tests for each of the above
+
+**Dependencies:** none
+
+---
 
 ### T17: Local HTTP API
 **Description:** A small HTTP API in the same process so a local assistant can list, add and remove watched items and read price history. Standard library only, bound to `127.0.0.1:8090`, bearer token from `WND_API_TOKEN`.

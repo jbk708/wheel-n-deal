@@ -99,6 +99,36 @@ async def test_blocked_stores_blocked_without_price(client, conn):
     assert route.call_count == 1
     assert status is Status.BLOCKED
     assert (obs.status, obs.price) == (Status.BLOCKED, None)
+    assert (obs.http_status, obs.block_reason) == (403, "http 403")
+
+
+async def test_amazon_captcha_page_is_blocked_with_reason(client, conn):
+    url = "https://www.amazon.com/dp/B0CRS3N43Q"
+    page = "<form method='get' action='/errors_page/validateCaptcha'><input name='amzn'></form>"
+    with respx.mock:
+        respx.get(url).respond(200, text=page)
+        llm = respx.post(COMPLETIONS)
+        status, [obs] = await _check(client, conn, url)
+    assert llm.call_count == 0
+    assert status is Status.BLOCKED
+    assert (obs.http_status, obs.block_reason) == (200, "bot wall (validatecaptcha)")
+
+
+async def test_fetch_error_stores_reason(client, conn):
+    url = "https://shop.example/products/grinder"
+    with respx.mock:
+        respx.get(url).respond(404, text="gone")
+        status, [obs] = await _check(client, conn, url)
+    assert status is Status.ERROR
+    assert (obs.http_status, obs.block_reason) == (404, "http 404")
+
+
+async def test_ok_has_status_and_no_reason(client, conn):
+    url = "https://shop.example/products/grinder"
+    with respx.mock:
+        respx.get(url).respond(200, text=(FIXTURES / "jsonld_product.html").read_text())
+        _, [obs] = await _check(client, conn, url)
+    assert (obs.http_status, obs.block_reason) == (200, None)
 
 
 async def test_structured_price_skips_mimo(client, conn):
@@ -147,6 +177,7 @@ async def test_mimo_sees_bot_wall_stores_blocked(client, conn):
         status, [obs] = await _check(client, conn, url)
     assert status is Status.BLOCKED
     assert obs.price is None
+    assert (obs.http_status, obs.block_reason) == (200, "bot wall (seen by MiMo)")
 
 
 async def test_mimo_down_keeps_last_known_price_as_stale(client, conn):

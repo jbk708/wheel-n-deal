@@ -7,6 +7,7 @@ from wheel_n_deal.fetch import (
     FetchStatus,
     block_reason,
     canonical_amazon_url,
+    canonical_url,
     fetch,
     make_client,
 )
@@ -38,6 +39,10 @@ def test_user_agent_is_honest_and_versioned():
             "https://www.amazon.com/gp/product/B0ABCDEF12?psc=1",
             "https://www.amazon.com/dp/B0ABCDEF12",
         ),
+        (
+            "http://www.amazon.com/dp/B0CRS3N43Q?ref=cm_sw_r_cp_ud_dp&th=1",
+            "https://www.amazon.com/dp/B0CRS3N43Q",
+        ),
         ("https://www.amazon.com/s?k=grinder", "https://www.amazon.com/s?k=grinder"),
         ("https://shop.example/products/x", "https://shop.example/products/x"),
     ],
@@ -60,6 +65,8 @@ def test_canonical_amazon_url(url, expected):
             "<p>Enter the characters you see below</p><form action='/errors/validateCaptcha'>",
             True,
         ),
+        (200, "<form method='get' action='/errors_page/validateCaptcha'>", True),
+        (200, "<form action='/ERRORS_PAGE/VALIDATECAPTCHA'>", True),
         (200, "<title>Just a moment...</title><div id='challenge-form'>", True),
         (200, "<div id='px-captcha'></div>", True),
         (200, "<h1>Access Denied</h1>You don't have permission to access", True),
@@ -94,7 +101,8 @@ async def test_fetch_follows_redirects(client):
 async def test_fetch_resolves_amazon_short_links(client, short):
     long_url = "https://www.amazon.com/Grinder-Thing/dp/B0ABCDEF12/ref=x?tag=y"
     with respx.mock:
-        respx.head(short).respond(301, headers={"location": long_url})
+        respx.head(short).respond(404)
+        respx.get(short).respond(301, headers={"location": long_url})
         page = respx.get("https://www.amazon.com/dp/B0ABCDEF12").respond(200, text=PRODUCT_HTML)
         result = await fetch(client, short)
     assert page.called
@@ -135,3 +143,36 @@ async def test_fetch_http_error_status_is_error(client):
         result = await fetch(client, "https://shop.example/gone")
     assert result.status is FetchStatus.ERROR
     assert result.http_status == 404
+
+
+async def test_canonical_url_resolves_short_link_with_get_without_fetching_the_page(client):
+    with respx.mock:
+        respx.get("https://a.co/d/0e5nj345").respond(
+            301,
+            headers={"location": "https://www.amazon.com/dp/B0CRS3N43Q?ref=cm_sw_r_cp_ud_dp"},
+        )
+        assert await canonical_url(client, "https://a.co/d/0e5nj345") == (
+            "https://www.amazon.com/dp/B0CRS3N43Q"
+        )
+        assert respx.calls.call_count == 1
+
+
+async def test_canonical_url_follows_short_link_chains(client):
+    with respx.mock:
+        respx.get("https://amzn.to/x").respond(301, headers={"location": "https://a.co/d/y"})
+        respx.get("https://a.co/d/y").respond(
+            302, headers={"location": "https://www.amazon.com/Thing/dp/B0ABCDEF12/ref=x"}
+        )
+        assert await canonical_url(client, "https://amzn.to/x") == (
+            "https://www.amazon.com/dp/B0ABCDEF12"
+        )
+
+
+async def test_canonical_url_needs_no_network_for_long_urls(client):
+    with respx.mock:
+        assert await canonical_url(client, "https://www.amazon.com/x/dp/B0ABCDEF12?tag=t") == (
+            "https://www.amazon.com/dp/B0ABCDEF12"
+        )
+        assert await canonical_url(client, "https://shop.example/p?id=1") == (
+            "https://shop.example/p?id=1"
+        )

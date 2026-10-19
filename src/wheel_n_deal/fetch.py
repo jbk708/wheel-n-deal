@@ -14,7 +14,7 @@ BLOCKED_HTTP_STATUSES = frozenset({403, 429, 503})
 # Markers of bot walls and CAPTCHA interstitials. We only detect them: a blocked page is
 # recorded and reported, never solved or worked around.
 BOT_WALL_MARKERS = (
-    "/errors/validatecaptcha",
+    "validatecaptcha",
     "enter the characters you see below",
     "px-captcha",
     "<title>just a moment...</title>",
@@ -53,7 +53,7 @@ def canonical_amazon_url(url: str) -> str:
     match = _AMAZON_ASIN.search(parts.path)
     if "amazon." not in parts.netloc or not match:
         return url
-    return f"{parts.scheme}://{parts.netloc}/dp/{match.group(1)}"
+    return f"https://{parts.netloc}/dp/{match.group(1)}"
 
 
 def block_reason(http_status: int, body: str) -> str | None:
@@ -68,11 +68,13 @@ def block_reason(http_status: int, body: str) -> str | None:
     return None
 
 
-async def resolve_short_link(client: httpx.AsyncClient, url: str) -> str:
+async def canonical_url(client: httpx.AsyncClient, url: str) -> str:
+    """Resolve Amazon short links and drop tracking parts, so one product has one URL."""
     for _ in range(MAX_SHORT_LINK_HOPS):
         if urlsplit(url).hostname not in SHORT_LINK_HOSTS:
             break
-        response = await client.head(url, follow_redirects=False)
+        # a.co answers HEAD with 404, so ask with GET but stop at the redirect.
+        response = await client.get(url, follow_redirects=False)
         location = response.headers.get("location")
         if not location:
             break
@@ -82,7 +84,7 @@ async def resolve_short_link(client: httpx.AsyncClient, url: str) -> str:
 
 async def fetch(client: httpx.AsyncClient, url: str) -> FetchResult:
     try:
-        url = await resolve_short_link(client, url)
+        url = await canonical_url(client, url)
         response = await client.get(url)
     except httpx.HTTPError as exc:
         return FetchResult(url=url, status=FetchStatus.ERROR, reason=type(exc).__name__)

@@ -5,6 +5,7 @@ It binds to loopback only and runs on its own threads beside the asyncio schedul
 request opens its own SQLite connection; the scheduler sees changes on its next reload.
 """
 
+import asyncio
 import hmac
 import json
 import logging
@@ -18,9 +19,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import httpx
 from pydantic import ValidationError
 
 from wheel_n_deal.config import WatchItem
+from wheel_n_deal.fetch import canonical_url, make_client
 from wheel_n_deal.store import (
     Observation,
     create_item,
@@ -46,11 +49,15 @@ class _BadRequest(Exception):
         self.status = status
 
 
-def item_json(conn: sqlite3.Connection, item_id: int, item: WatchItem) -> dict:
+# Diagnostic fields are opt-in (?detail=1): clients that validate the original shape
+# strictly would reject unknown keys.
+def item_json(
+    conn: sqlite3.Connection, item_id: int, item: WatchItem, detail: bool = False
+) -> dict:
     latest = read_observations(conn, item_id, limit=1)
     # A blocked or failed check has no price, so report the last one actually seen.
     priced = read_last_priced(conn, item_id)
-    return {
+    found = {
         "id": item_id,
         "name": item.name,
         "url": item.url,
@@ -62,16 +69,33 @@ def item_json(conn: sqlite3.Connection, item_id: int, item: WatchItem) -> dict:
         "last_checked": latest[0].checked_at if latest else None,
         "last_status": latest[0].status.value if latest else None,
     }
+    if detail:
+        found["last_http_status"] = latest[0].http_status if latest else None
+        found["last_block_reason"] = latest[0].block_reason if latest else None
+    return found
 
 
-def observation_json(obs: Observation) -> dict:
-    return {
+def observation_json(obs: Observation, detail: bool = False) -> dict:
+    found = {
         "checked_at": obs.checked_at,
         "status": obs.status.value,
         "price": obs.price,
         "currency": obs.currency,
         "in_stock": obs.in_stock,
     }
+    if detail:
+        found["http_status"] = obs.http_status
+        found["block_reason"] = obs.block_reason
+    return found
+
+
+def _parse_detail(query: str) -> bool:
+    return parse_qs(query).get("detail") == ["1"]
+
+
+async def _canonical(url: str) -> str:
+    async with make_client() as client:
+        return await canonical_url(client, url)
 
 
 def _parse_limit(query: str) -> int:
@@ -132,8 +156,9 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
             history_path = _HISTORY_PATH.fullmatch(path)
             if method == "GET" and path == "/items":
                 items = read_items(conn)
+                detail = _parse_detail(query)
                 return self._send(
-                    HTTPStatus.OK, [item_json(conn, i, it) for i, it in items.items()]
+                    HTTPStatus.OK, [item_json(conn, i, it, detail) for i, it in items.items()]
                 )
             if method == "POST" and path == "/items":
                 return self._add(conn)
@@ -148,6 +173,13 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
 
         def _add(self, conn: sqlite3.Connection) -> None:
             item = _parse_item(self._body())
+            try:
+                url = asyncio.run(_canonical(item.url))
+            except httpx.HTTPError as exc:
+                raise _BadRequest(
+                    HTTPStatus.BAD_GATEWAY, f"could not resolve short link: {type(exc).__name__}"
+                ) from exc
+            item = item.model_copy(update={"url": url})
             item_id = create_item(conn, item)
             if item_id is None:
                 return self._send(HTTPStatus.CONFLICT, {"error": "url is already watched"})
@@ -158,7 +190,8 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
             if not exists:
                 return self._send(HTTPStatus.NOT_FOUND, {"error": "no such item"})
             history = read_observations(conn, item_id, limit=_parse_limit(query))
-            self._send(HTTPStatus.OK, [observation_json(obs) for obs in history])
+            detail = _parse_detail(query)
+            self._send(HTTPStatus.OK, [observation_json(obs, detail) for obs in history])
 
         def _authorized(self) -> bool:
             given = self.headers.get("Authorization", "").encode()

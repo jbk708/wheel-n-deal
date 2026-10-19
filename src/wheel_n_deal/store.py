@@ -32,7 +32,9 @@ _SCHEMA = [
         status TEXT NOT NULL CHECK (status IN ({", ".join(f"'{s.value}'" for s in Status)})),
         price REAL,
         currency TEXT,
-        in_stock INTEGER
+        in_stock INTEGER,
+        http_status INTEGER,
+        block_reason TEXT
     )
     """,
     "CREATE INDEX IF NOT EXISTS observations_item ON observations (item_id, checked_at)",
@@ -61,6 +63,13 @@ class Observation:
     price: float | None
     currency: str | None
     in_stock: bool | None
+    http_status: int | None = None
+    block_reason: str | None = None
+
+
+_OBSERVATION_COLUMNS = (
+    "item_id, checked_at, status, price, currency, in_stock, http_status, block_reason"
+)
 
 
 def _observation(row: tuple) -> Observation:
@@ -71,6 +80,8 @@ def _observation(row: tuple) -> Observation:
         price=row[3],
         currency=row[4],
         in_stock=None if row[5] is None else bool(row[5]),
+        http_status=row[6],
+        block_reason=row[7],
     )
 
 
@@ -80,17 +91,18 @@ def open_store(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     for statement in _SCHEMA:
         conn.execute(statement)
-    _add_missing_item_columns(conn)
+    # Older databases lack columns added later; add them in place, keeping every row.
+    _add_missing_columns(conn, "items", {"notes": "TEXT", "removed_at": "TEXT"})
+    _add_missing_columns(conn, "observations", {"http_status": "INTEGER", "block_reason": "TEXT"})
     conn.commit()
     return conn
 
 
-def _add_missing_item_columns(conn: sqlite3.Connection) -> None:
-    """Databases created before the watch list moved into SQLite lack these columns."""
-    have = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
-    for column in ("notes", "removed_at"):
+def _add_missing_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for column, kind in columns.items():
         if column not in have:
-            conn.execute(f"ALTER TABLE items ADD COLUMN {column} TEXT")
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
 
 def seed_item(conn: sqlite3.Connection, item: WatchItem) -> None:
@@ -146,8 +158,7 @@ def read_item_id(conn: sqlite3.Connection, url: str) -> int | None:
 
 def create_observation(conn: sqlite3.Connection, obs: Observation) -> None:
     conn.execute(
-        "INSERT INTO observations (item_id, checked_at, status, price, currency, in_stock)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
+        f"INSERT INTO observations ({_OBSERVATION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             obs.item_id,
             obs.checked_at,
@@ -155,6 +166,8 @@ def create_observation(conn: sqlite3.Connection, obs: Observation) -> None:
             obs.price,
             obs.currency,
             None if obs.in_stock is None else int(obs.in_stock),
+            obs.http_status,
+            obs.block_reason,
         ),
     )
     conn.commit()
@@ -164,7 +177,7 @@ def read_observations(
     conn: sqlite3.Connection, item_id: int, limit: int | None = None
 ) -> list[Observation]:
     rows = conn.execute(
-        "SELECT item_id, checked_at, status, price, currency, in_stock FROM observations"
+        f"SELECT {_OBSERVATION_COLUMNS} FROM observations"
         " WHERE item_id = ? ORDER BY checked_at DESC, id DESC LIMIT ?",
         (item_id, -1 if limit is None else limit),
     )
@@ -186,7 +199,7 @@ def update_alert_armed(conn: sqlite3.Connection, item_id: int, armed: bool, at: 
 
 def read_last_priced(conn: sqlite3.Connection, item_id: int) -> Observation | None:
     row = conn.execute(
-        "SELECT item_id, checked_at, status, price, currency, in_stock FROM observations"
+        f"SELECT {_OBSERVATION_COLUMNS} FROM observations"
         " WHERE item_id = ? AND price IS NOT NULL ORDER BY checked_at DESC, id DESC LIMIT 1",
         (item_id,),
     ).fetchone()

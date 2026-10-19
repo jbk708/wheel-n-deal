@@ -51,11 +51,18 @@ def _read_learned(
     return None
 
 
-def _last_known(conn: sqlite3.Connection, item_id: int) -> tuple[Status, Extraction | None]:
+Outcome = tuple[Status, Extraction | None, str | None]
+
+
+def _last_known(conn: sqlite3.Connection, item_id: int, reason: str) -> Outcome:
     last = read_last_priced(conn, item_id)
     if not last:
-        return Status.STALE, None
-    return Status.STALE, Extraction(last.price, last.currency, last.in_stock, "last-known")
+        return Status.STALE, None, reason
+    return (
+        Status.STALE,
+        Extraction(last.price, last.currency, last.in_stock, "last-known"),
+        reason,
+    )
 
 
 async def _read_with_mimo(
@@ -65,17 +72,17 @@ async def _read_with_mimo(
     item: WatchItem,
     page: FetchResult,
     checked_at: str,
-) -> tuple[Status, Extraction | None]:
+) -> Outcome:
     answer = await mimo.extract(page.url, page.body)
     if answer is None:
         logger.warning("stale: %s (MiMo unavailable, keeping last known price)", item.name)
-        return _last_known(conn, item_id)
+        return _last_known(conn, item_id, "MiMo unavailable")
     if answer.blocked:
         logger.warning("blocked: %s (MiMo saw a bot wall)", item.name)
-        return Status.BLOCKED, None
+        return Status.BLOCKED, None, "bot wall (seen by MiMo)"
     if answer.price is None:
         logger.warning("no price found: %s", item.name)
-        return Status.ERROR, None
+        return Status.ERROR, None, "no price found"
     selector = derive_selector(page.body, answer.price, answer.evidence)
     if selector:
         write_selector(conn, item_id, selector, checked_at)
@@ -86,9 +93,9 @@ async def _read_with_mimo(
             item.name,
             answer.price,
         )
-        return _last_known(conn, item_id)
+        return _last_known(conn, item_id, "MiMo price not on page")
     logger.info("ok: %s %.2f via mimo (learned: %s)", item.name, answer.price, selector)
-    return Status.OK, Extraction(answer.price, answer.currency, answer.in_stock, "mimo")
+    return Status.OK, Extraction(answer.price, answer.currency, answer.in_stock, "mimo"), None
 
 
 async def _read_page(
@@ -99,7 +106,7 @@ async def _read_page(
     item: WatchItem,
     page: FetchResult,
     checked_at: str,
-) -> tuple[Status, Extraction | None]:
+) -> Outcome:
     found = (
         extract(page.body, page.url)
         or await read_shopify_extraction(client, page.body, page.url)
@@ -107,7 +114,7 @@ async def _read_page(
     )
     if found:
         logger.info("ok: %s %.2f via %s", item.name, found.price, found.source)
-        return Status.OK, found
+        return Status.OK, found, None
     return await _read_with_mimo(conn, mimo, item_id, item, page, checked_at)
 
 
@@ -122,6 +129,7 @@ async def check_item(
     """Return the stored observation and, when the page was fetched, its HTML."""
     fetched = await fetch(client, item.url)
     found = None
+    reason = fetched.reason
     if fetched.status is FetchStatus.BLOCKED:
         logger.warning("blocked: %s (%s)", item.name, fetched.reason)
         status = Status.BLOCKED
@@ -129,7 +137,9 @@ async def check_item(
         logger.warning("fetch error: %s (%s)", item.name, fetched.reason)
         status = Status.ERROR
     else:
-        status, found = await _read_page(client, conn, mimo, item_id, item, fetched, checked_at)
+        status, found, reason = await _read_page(
+            client, conn, mimo, item_id, item, fetched, checked_at
+        )
     obs = Observation(
         item_id=item_id,
         checked_at=checked_at,
@@ -137,6 +147,8 @@ async def check_item(
         price=found.price if found else None,
         currency=found.currency if found else None,
         in_stock=found.in_stock if found else None,
+        http_status=fetched.http_status,
+        block_reason=reason,
     )
     create_observation(conn, obs)
     return obs, fetched.body if fetched.status is FetchStatus.OK else None
