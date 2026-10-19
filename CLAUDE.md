@@ -10,6 +10,7 @@ House pattern, same as `release-triage` / `crosspoint-sync`: Python 3.12+ + uv, 
 
 Hard rules for this project:
 - **Fetching**: shop requests look like desktop Chrome (Chrome UA plus matching `Accept*`, `sec-ch-ua*`, `sec-fetch-*` headers; keep `CHROME_MAJOR` in `fetch.py` in step with the Chromium bundled by the pinned Playwright). A blocked page (403/429/503/bot wall/empty) gets exactly one headless Chromium retry; if that is refused too, the check is `status=blocked` and waits for the next normal slot. No CAPTCHA solving or solver services. Our own services (MiMo, ntfy, heartbeat) get the app UA `wheel-n-deal/<version> (+personal price tracker)`.
+- **Proxy**: `fetch.proxy_url` carries shop fetches only (`ShopClient`, short-link resolution, headless Chromium). MiMo, ntfy, heartbeat and the local API never use it. A configured but unreachable proxy must fail the check as `error`; never add a direct fallback (it would expose the household IP).
 - **Politeness**: per-site minimum interval (hours), jittered schedule, one request at a time per site.
 - **MiMo is optional infrastructure**: it can be down for hours. Every MiMo call degrades gracefully (keep last known price, mark stale, alert anyway); nothing crashes because the LLM is unreachable.
 

@@ -127,3 +127,14 @@ def test_secrets_repr_hides_values():
     assert "sekrit" not in repr(secrets)
     assert "tok" not in repr(secrets)
     assert "apitok" not in repr(secrets)
+
+
+def test_fetch_proxy_defaults_off_and_loads(tmp_path):
+    assert load_config(ROOT / "config.example.yaml").fetch.proxy_url is None
+    text = _example() + "\nfetch:\n  proxy_url: http://127.0.0.1:8888\n"
+    assert load_config(_write(tmp_path, text)).fetch.proxy_url == "http://127.0.0.1:8888"
+
+
+def test_fetch_proxy_must_be_http_url(tmp_path):
+    with pytest.raises(ValidationError):
+        load_config(_write(tmp_path, _example() + "\nfetch:\n  proxy_url: 127.0.0.1:8888\n"))

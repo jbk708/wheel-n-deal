@@ -12,6 +12,7 @@ import sqlite3
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 import httpx
@@ -20,7 +21,7 @@ from wheel_n_deal.api import start_api
 from wheel_n_deal.browser import render
 from wheel_n_deal.check import Render, check_item
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
-from wheel_n_deal.fetch import canonical_url, make_client, make_shop_client
+from wheel_n_deal.fetch import ShopClient, canonical_url, make_client, make_shop_client
 from wheel_n_deal.heartbeat import ping
 from wheel_n_deal.llm import MiMo, format_verdict
 from wheel_n_deal.notify import alert_on_price, blocked_message, publish
@@ -42,12 +43,10 @@ _HEARTBEAT_SECONDS = 30
 _RELOAD_SECONDS = 60
 
 
-async def seed_watch_list(
-    conn: sqlite3.Connection, config: Config, client: httpx.AsyncClient
-) -> None:
+async def seed_watch_list(conn: sqlite3.Connection, config: Config, shop: ShopClient) -> None:
     for item in config.watch:
         try:
-            url = await canonical_url(client, item.url)
+            url = await canonical_url(shop, item.url)
         except httpx.HTTPError as exc:
             # Seeding the short link would duplicate the item once it resolves.
             logger.warning("not seeding %s yet: %s", item.url, type(exc).__name__)
@@ -87,7 +86,7 @@ async def run_forever(
     config: Config,
     conn: sqlite3.Connection,
     client: httpx.AsyncClient,
-    shop: httpx.AsyncClient,
+    shop: ShopClient,
     secrets: Secrets,
     render: Render,
     clock: Callable[[], float] = time.time,
@@ -161,11 +160,13 @@ async def _main(config: Config) -> None:
     db_path = config.data_dir / "state.db"
     conn = open_store(db_path)
     secrets = Secrets.from_env()
-    start_api(db_path, secrets.api_token)
-    async with make_client() as client, make_shop_client() as shop:
+    proxy_url = config.fetch.proxy_url
+    start_api(db_path, secrets.api_token, proxy_url)
+    logger.info("shop fetches %s", "via proxy" if proxy_url else "direct (no proxy)")
+    async with make_client() as client, make_shop_client(proxy_url) as shop:
         await asyncio.gather(
             touch_heartbeat(config.data_dir / "heartbeat"),
-            run_forever(config, conn, client, shop, secrets, render),
+            run_forever(config, conn, client, shop, secrets, partial(render, proxy_url=proxy_url)),
         )
 
 

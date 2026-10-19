@@ -32,6 +32,7 @@ Read-only diagnostics on the live environment — check health, investigate inci
 - Health: Docker HEALTHCHECK fails when `/data/heartbeat` is older than 180s (touched every 30s). Unhealthy usually means `data/` is not writable by uid 1000 or `data_dir` is not `/data`. Healthy only proves the event loop is alive; each run logs a `checked / ok / blocked / failed` summary line — check that for actual progress.
 - `stale` on every run with `MiMo skipped: LLM_API_KEY is not set` = missing env var, not a MiMo outage. ntfy failures log `ntfy publish failed: …` and leave the alert armed for the next check.
 - Never print `~/wheel-n-deal/.env` or the heartbeat URL.
+- Shop fetches go through `fetch.proxy_url` (a local VPN-backed HTTP proxy on the host, if configured). `status=error` with `proxy unreachable` / `ERR_PROXY_CONNECTION_FAILED` = the proxy or its tunnel is down; never test a shop directly from the host to compare.
 - `status=blocked` means both the plain fetch and the headless Chromium retry were refused; it can happen and is not an incident. `GET /items?detail=1` / `observations.block_reason` say what each attempt got. MiMo being down for hours is also expected: observations go `stale`, alerts still send.
 
 - Verify the actual deployed configuration rather than assuming the full service set is running everywhere — environments drift.

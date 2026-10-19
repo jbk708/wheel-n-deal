@@ -21,6 +21,7 @@ wheel-n-deal fetches like an ordinary desktop browser and checks each site rarel
 - Each site (registrable domain) is checked at most once per `politeness.min_interval_hours` (default 6), with random jitter, and only one request runs at a time per site.
 - When a site answers with 403, 429 or 503, serves a bot-wall or CAPTCHA page, or returns an empty body, that one item is retried once with headless Chromium (Playwright): Chrome User-Agent and client hints, 1920x1080 viewport, `en-US`, `America/Los_Angeles`, waiting for the network to go idle. The rendered HTML goes through the normal extraction below. If the browser is refused too, the check is recorded as `status=blocked` (or `error` if the browser failed) and tried again at the next normal slot, not sooner. Newly blocked items are reported in one ntfy summary.
 - CAPTCHAs are never solved, and no CAPTCHA-solving service is used.
+- With `fetch.proxy_url` set, every shop request (plain, short-link resolution and headless) goes through that proxy. If the proxy is down, the check is recorded as `status=error` with reason `proxy unreachable (...)` (or `net::ERR_PROXY_CONNECTION_FAILED` from the browser); it never falls back to a direct connection. Headless Chromium is started with WebRTC limited to proxied traffic, so pages cannot learn the real address over UDP. Proxy environment variables (`HTTP_PROXY` etc.) are ignored by both HTTP clients.
 
 Some large retailers may still block it. The troubleshooting section below covers that.
 
@@ -55,6 +56,7 @@ Two files sit next to the container. Neither is committed.
 | `llm.model` | no | `mimo-v2.6-flash` | Model name. |
 | `politeness.min_interval_hours` | no | `6` | Minimum time between checks of the same site. |
 | `politeness.jitter_minutes` | no | `30` | Random delay added to each site's next check. |
+| `fetch.proxy_url` | no | unset | HTTP proxy for shop page fetches only (plain requests, short-link resolution and headless Chromium), e.g. a local VPN-backed proxy at `http://127.0.0.1:8888`. MiMo, ntfy, the heartbeat and the local API never use it. |
 | `data_dir` | no | `/data` | Holds `state.db` and the `heartbeat` file. Keep `/data` in the container. |
 | `heartbeat_url` | no | | Uptime Kuma push URL, fetched with GET after each successful run. It is never logged. |
 
@@ -148,7 +150,7 @@ Do not lower `min_interval_hours` to "try harder". Checking more often makes blo
 
 **Observations are `stale`.** The page was fetched, but structured extraction failed and the LLM could not be reached, gave an invalid answer, or reported a price that does not appear anywhere on the page (no alert is sent for an unverified price). The last known price is kept and marked `stale`, and nothing crashes. The LLM endpoint can be down for hours. Checks resume normally once it is back. If an item is stale on every run, look for `MiMo skipped: LLM_API_KEY is not set`, `not on page`, or LLM HTTP errors in the logs.
 
-**Status is `error`.** The fetch failed (DNS, timeout, connection), or the page loaded but no price was found anywhere. If that happens on every run for one item, the URL is probably wrong or the product is gone.
+**Status is `error`.** If the reason is `proxy unreachable` or `ERR_PROXY_CONNECTION_FAILED`, the proxy in `fetch.proxy_url` is down (for a VPN proxy, check that its tunnel is up); nothing is fetched directly in the meantime. Otherwise the fetch failed (DNS, timeout, connection), or the page loaded but no price was found anywhere. If that happens on every run for one item, the URL is probably wrong or the product is gone.
 
 **No notifications arrive.** Check that `ntfy.url` and `ntfy.topic` are correct, that `NTFY_TOKEN` is set in `.env`, and look for `ntfy publish failed` in the logs. A price that is already below target when you add an item alerts once. Later checks stay quiet until the price recovers above target and drops again.
 

@@ -10,7 +10,7 @@ import httpx
 import respx
 
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
-from wheel_n_deal.fetch import FetchResult, FetchStatus, make_client
+from wheel_n_deal.fetch import FetchResult, FetchStatus, make_client, make_shop_client
 from wheel_n_deal.main import load_schedule, run_forever, seed_watch_list, touch_heartbeat
 from wheel_n_deal.store import (
     Observation,
@@ -58,7 +58,7 @@ async def still_blocked(url: str) -> FetchResult:
 async def test_seed_watch_list_imports_every_item_once(tmp_path):
     config = load_config(ROOT / "config.example.yaml")
     conn = open_store(tmp_path / "state.db")
-    async with make_client() as client:
+    async with make_shop_client(None) as client:
         await seed_watch_list(conn, config, client)
         first = read_items(conn)
         assert sorted(first.values(), key=lambda i: i.url) == sorted(
@@ -74,7 +74,7 @@ async def test_seed_canonicalizes_and_skips_unresolvable_short_links(tmp_path, c
     long_url = "https://www.amazon.com/Thing/dp/B0ABCDEF12?tag=x"
     config = _config(tmp_path, [long_url, "https://a.co/d/broken"])
     conn = open_store(tmp_path / "state.db")
-    async with make_client() as client:
+    async with make_shop_client(None) as client:
         with respx.mock:
             respx.get("https://a.co/d/broken").mock(side_effect=httpx.ConnectError("down"))
             await seed_watch_list(conn, config, client)
@@ -98,10 +98,10 @@ async def test_run_forever_checks_items_from_the_database(tmp_path):
         b = respx.get(URL_B).respond(429)
         respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client:
+        async with make_client() as client, make_shop_client(None) as shop:
             try:
                 await run_forever(
-                    config, conn, client, client, Secrets(None, "t"), still_blocked, sleep=stop
+                    config, conn, client, shop, Secrets(None, "t"), still_blocked, sleep=stop
                 )
             except _Stop:
                 pass
@@ -129,13 +129,13 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
         respx.get(URL_B).respond(429)
         ntfy = respx.post("https://ntfy.example/").respond(200)
         heartbeat = respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client:
+        async with make_client() as client, make_shop_client(None) as shop:
             try:
                 await run_forever(
                     config,
                     conn,
                     client,
-                    client,
+                    shop,
                     Secrets(llm_api_key=None, ntfy_token="t"),
                     still_blocked,
                     clock=lambda: now[0],
@@ -185,13 +185,13 @@ async def _run_with_changes(
         respx.get(url__regex=r"https://(shop|other)\.example/.*").mock(side_effect=record)
         respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client:
+        async with make_client() as client, make_shop_client(None) as shop:
             try:
                 await run_forever(
                     config,
                     conn,
                     client,
-                    client,
+                    shop,
                     Secrets(None, "t"),
                     still_blocked,
                     clock=lambda: now[0],
@@ -256,13 +256,13 @@ async def test_price_drop_alert_carries_mimo_verdict(tmp_path):
         llm = respx.post("https://llm.example/v1/chat/completions").respond(200, json=completion)
         ntfy = respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client:
+        async with make_client() as client, make_shop_client(None) as shop:
             try:
                 await run_forever(
                     config,
                     conn,
                     client,
-                    client,
+                    shop,
                     Secrets(llm_api_key="k", ntfy_token="t"),
                     still_blocked,
                     sleep=stop,

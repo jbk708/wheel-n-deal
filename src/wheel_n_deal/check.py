@@ -4,11 +4,9 @@ import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 
-import httpx
-
 from wheel_n_deal.config import WatchItem
 from wheel_n_deal.extract import Extraction, extract, extract_shopify_js, shopify_js_url
-from wheel_n_deal.fetch import FetchResult, FetchStatus, fetch
+from wheel_n_deal.fetch import FetchResult, FetchStatus, ShopClient, fetch
 from wheel_n_deal.learned import derive_selector, price_on_page, read_price
 from wheel_n_deal.llm import MiMo
 from wheel_n_deal.store import (
@@ -26,9 +24,7 @@ logger = logging.getLogger(__name__)
 Render = Callable[[str], Awaitable[FetchResult]]
 
 
-async def read_shopify_extraction(
-    client: httpx.AsyncClient, html: str, url: str
-) -> Extraction | None:
+async def read_shopify_extraction(client: ShopClient, html: str, url: str) -> Extraction | None:
     js_url = shopify_js_url(html, url)
     if not js_url:
         return None
@@ -103,7 +99,7 @@ async def _read_with_mimo(
 
 
 async def _read_page(
-    client: httpx.AsyncClient,
+    client: ShopClient,
     conn: sqlite3.Connection,
     mimo: MiMo,
     item_id: int,
@@ -138,7 +134,7 @@ async def _retry_headless(item: WatchItem, blocked: FetchResult, render: Render)
 
 
 async def check_item(
-    client: httpx.AsyncClient,
+    client: ShopClient,
     conn: sqlite3.Connection,
     mimo: MiMo,
     item_id: int,

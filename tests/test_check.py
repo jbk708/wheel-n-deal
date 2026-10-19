@@ -7,7 +7,7 @@ import respx
 
 from wheel_n_deal.check import check_item
 from wheel_n_deal.config import LLMConfig, WatchItem
-from wheel_n_deal.fetch import FetchResult, FetchStatus, make_client
+from wheel_n_deal.fetch import FetchResult, FetchStatus, make_shop_client
 from wheel_n_deal.llm import MiMo
 from wheel_n_deal.store import (
     Observation,
@@ -47,7 +47,7 @@ async def still_blocked(url: str) -> FetchResult:
 
 @pytest.fixture
 async def client():
-    async with make_client() as c:
+    async with make_shop_client(None) as c:
         yield c
 
 
@@ -157,6 +157,15 @@ async def test_headless_only_runs_for_blocked_pages(client, conn, code):
     with respx.mock:
         respx.get(url).respond(code, text=(FIXTURES / "jsonld_product.html").read_text())
         await _check(client, conn, url, render=render)
+    assert render.urls == []
+
+
+async def test_unreachable_proxy_is_error_and_skips_headless(conn, dead_proxy_url):
+    render = _Renderer(html="<title>x</title>")
+    async with make_shop_client(dead_proxy_url) as shop:
+        status, [obs] = await _check(shop, conn, "https://shop.example/p", render=render)
+    assert status is Status.ERROR
+    assert obs.block_reason == "proxy unreachable (ConnectError)"
     assert render.urls == []
 
 

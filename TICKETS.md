@@ -8,22 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T20: Fetch shop pages through an HTTP proxy
-**Description:** Optional `fetch.proxy_url` (e.g. a local VPN-backed proxy) used only for shop page fetches, plain and headless. MiMo, ntfy, the heartbeat and the local API never use it. If the proxy is configured but unreachable, the check fails as `error`; it never falls back to a direct connection.
-
-**Deliverables:**
-- [ ] `fetch.proxy_url` config (optional)
-- [ ] Shop client (httpx) and headless Chromium use the proxy; the other client does not
-- [ ] Short-link resolution at add time also goes through the proxy
-- [ ] Unreachable proxy → `status=error` with a clear reason; no direct retry
-- [ ] Headless Chromium cannot leak the real address over WebRTC
-- [ ] README config section
-- [ ] Tests
-
-**Dependencies:** T19
-
----
-
 ### T14: Purge the legacy SQLite file from git history
 **Description:** `main` no longer tracks `backend/wheel_n_deal.db` (untracked in T1, `*.db` ignored), but this repo is public and older commits still contain a version of that file with personal data (a user row with a phone number, plus email and password-hash columns). Removing it needs a history rewrite, which **requires the owner's explicit approval** before anyone starts.
 
@@ -38,6 +22,23 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T20: Fetch shop pages through an HTTP proxy
+**Description:** Optional `fetch.proxy_url` (e.g. a local VPN-backed proxy) used only for shop page fetches, plain and headless. MiMo, ntfy, the heartbeat and the local API never use it. If the proxy is configured but unreachable, the check fails as `error`; it never falls back to a direct connection.
+
+**Deliverables:**
+- [x] `fetch.proxy_url` config (optional)
+- [x] Shop client (httpx) and headless Chromium use the proxy; the other client does not
+- [x] Short-link resolution at add time also goes through the proxy
+- [x] Unreachable proxy → `status=error` with a clear reason; no direct retry
+- [x] Headless Chromium cannot leak the real address over WebRTC
+- [x] README config section, `config.example.yaml`, CLAUDE.md rule
+- [x] Both HTTP clients ignore proxy environment variables (`trust_env=False`)
+- [x] Tests
+
+**Dependencies:** T19
+
+---
 
 ### T19: Browser-like fetching with a headless fallback
 **Description:** Some shops (Sephora behind Akamai, Amazon) refuse a request that announces itself as a bot. Fetch with a current desktop Chrome User-Agent and matching browser headers. If a page is still blocked (403, 429, 503 or a bot wall), retry that one item once with headless Chromium (Playwright) and extract from the rendered HTML through the same pipeline. No CAPTCHA solving. Per-site spacing and jitter are unchanged.

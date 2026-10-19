@@ -93,8 +93,8 @@ def _parse_detail(query: str) -> bool:
     return parse_qs(query).get("detail") == ["1"]
 
 
-async def _canonical(url: str) -> str:
-    async with make_shop_client() as client:
+async def _canonical(url: str, proxy_url: str | None) -> str:
+    async with make_shop_client(proxy_url) as client:
         return await canonical_url(client, url)
 
 
@@ -119,7 +119,9 @@ def _parse_item(raw: bytes) -> WatchItem:
         raise _BadRequest(HTTPStatus.BAD_REQUEST, f"invalid item: {problems}") from exc
 
 
-def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPServer:
+def make_server(
+    db_path: Path, token: str, port: int = PORT, proxy_url: str | None = None
+) -> ThreadingHTTPServer:
     expected = f"Bearer {token}".encode()
 
     class Handler(BaseHTTPRequestHandler):
@@ -174,7 +176,7 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
         def _add(self, conn: sqlite3.Connection) -> None:
             item = _parse_item(self._body())
             try:
-                url = asyncio.run(_canonical(item.url))
+                url = asyncio.run(_canonical(item.url, proxy_url))
             except httpx.HTTPError as exc:
                 raise _BadRequest(
                     HTTPStatus.BAD_GATEWAY, f"could not resolve short link: {type(exc).__name__}"
@@ -220,11 +222,13 @@ def make_server(db_path: Path, token: str, port: int = PORT) -> ThreadingHTTPSer
     return ThreadingHTTPServer((HOST, port), Handler)
 
 
-def start_api(db_path: Path, token: str | None) -> ThreadingHTTPServer | None:
+def start_api(
+    db_path: Path, token: str | None, proxy_url: str | None
+) -> ThreadingHTTPServer | None:
     if not token:
         logger.warning("WND_API_TOKEN is not set; local API disabled")
         return None
-    server = make_server(db_path, token)
+    server = make_server(db_path, token, proxy_url=proxy_url)
     threading.Thread(target=server.serve_forever, name="api", daemon=True).start()
     logger.info("api listening on http://%s:%d", HOST, PORT)
     return server

@@ -69,20 +69,31 @@ class FetchResult:
     reason: str | None = None
 
 
+# trust_env=False: proxy environment variables must never reroute either client. Shops go
+# through fetch.proxy_url only; our own services always go direct.
 def make_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         headers={"User-Agent": APP_USER_AGENT},
         timeout=TIMEOUT_SECONDS,
         follow_redirects=True,
+        trust_env=False,
     )
 
 
-def make_shop_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        headers=BROWSER_HEADERS,
-        timeout=TIMEOUT_SECONDS,
-        follow_redirects=True,
-    )
+class ShopClient(httpx.AsyncClient):
+    def __init__(self, proxy_url: str | None) -> None:
+        super().__init__(
+            headers=BROWSER_HEADERS,
+            timeout=TIMEOUT_SECONDS,
+            follow_redirects=True,
+            proxy=proxy_url,
+            trust_env=False,
+        )
+        self.proxy_url = proxy_url
+
+
+def make_shop_client(proxy_url: str | None) -> ShopClient:
+    return ShopClient(proxy_url)
 
 
 def canonical_amazon_url(url: str) -> str:
@@ -105,7 +116,7 @@ def block_reason(http_status: int, body: str) -> str | None:
     return None
 
 
-async def canonical_url(client: httpx.AsyncClient, url: str) -> str:
+async def canonical_url(client: ShopClient, url: str) -> str:
     """Resolve Amazon short links and drop tracking parts, so one product has one URL."""
     for _ in range(MAX_SHORT_LINK_HOPS):
         if urlsplit(url).hostname not in SHORT_LINK_HOSTS:
@@ -119,10 +130,16 @@ async def canonical_url(client: httpx.AsyncClient, url: str) -> str:
     return canonical_amazon_url(url)
 
 
-async def fetch(client: httpx.AsyncClient, url: str) -> FetchResult:
+async def fetch(client: ShopClient, url: str) -> FetchResult:
     try:
         url = await canonical_url(client, url)
         response = await client.get(url)
+    except (httpx.ProxyError, httpx.ConnectError) as exc:
+        # Through a proxy every connection is to the proxy, so this means it is down.
+        reason = type(exc).__name__
+        if client.proxy_url:
+            reason = f"proxy unreachable ({reason})"
+        return FetchResult(url, FetchStatus.ERROR, reason=reason)
     except httpx.HTTPError as exc:
         return FetchResult(url=url, status=FetchStatus.ERROR, reason=type(exc).__name__)
     return classify(str(response.url), response.status_code, response.text)
