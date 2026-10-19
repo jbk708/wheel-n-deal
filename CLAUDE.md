@@ -1,15 +1,15 @@
 # wheel-n-deal
 
-Personal price tracker: a watch list in SQLite (seeded from `config.yaml`, edited through a loopback-only HTTP API) → polite plain-HTTP fetch → structured price extraction (MiMo fallback only when that fails) → SQLite history → ntfy alert when a price drops below target. One long-lived container with an internal asyncio scheduler. See `README.md`.
+Personal price tracker: a watch list in SQLite (seeded from `config.yaml`, edited through a loopback-only HTTP API) → polite fetch with browser headers (headless Chromium retry when blocked) → structured price extraction (MiMo fallback only when that fails) → SQLite history → ntfy alert when a price drops below target. One long-lived container with an internal asyncio scheduler. See `README.md`.
 
 **This repo is PUBLIC.** Never commit secrets, `.env`, `*.db`, real phone numbers, hostnames of private services, or personal data.
 
 ## Stack
 
-House pattern, same as `release-triage` / `crosspoint-sync`: Python 3.12+ + uv, `src/wheel_n_deal/`, httpx, pydantic config loaded from YAML, SQLite in `/data`, pytest (+ respx), ruff check + format, `Dockerfile` + `compose.yaml`, `scripts/deploy.sh` (git-archive over ssh into `releases/<tag>` + `current` symlink + health wait), semver tags. The pre-rebuild stack (FastAPI + Celery + Redis + Postgres + signal-cli + Selenium) has been retired; its history remains in git.
+House pattern, same as `release-triage` / `crosspoint-sync`: Python 3.12+ + uv, `src/wheel_n_deal/`, httpx, Playwright (Chromium only, pinned), pydantic config loaded from YAML, SQLite in `/data`, pytest (+ respx), ruff check + format, `Dockerfile` + `compose.yaml`, `scripts/deploy.sh` (git-archive over ssh into `releases/<tag>` + `current` symlink + health wait), semver tags. The pre-rebuild stack (FastAPI + Celery + Redis + Postgres + signal-cli + Selenium) has been retired; its history remains in git.
 
 Hard rules for this project:
-- **No bot evasion of any kind**: no stealth plugins, CAPTCHA solvers, residential proxies, rotating or spoofed User-Agents. Honest UA `wheel-n-deal/<version> (+personal price tracker)`. A blocked site is recorded as `status=blocked` and reported, not retried aggressively.
+- **Fetching**: shop requests look like desktop Chrome (Chrome UA plus matching `Accept*`, `sec-ch-ua*`, `sec-fetch-*` headers; keep `CHROME_MAJOR` in `fetch.py` in step with the Chromium bundled by the pinned Playwright). A blocked page (403/429/503/bot wall/empty) gets exactly one headless Chromium retry; if that is refused too, the check is `status=blocked` and waits for the next normal slot. No CAPTCHA solving or solver services. Our own services (MiMo, ntfy, heartbeat) get the app UA `wheel-n-deal/<version> (+personal price tracker)`.
 - **Politeness**: per-site minimum interval (hours), jittered schedule, one request at a time per site.
 - **MiMo is optional infrastructure**: it can be down for hours. Every MiMo call degrades gracefully (keep last known price, mark stale, alert anyway); nothing crashes because the LLM is unreachable.
 

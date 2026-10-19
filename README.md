@@ -1,10 +1,11 @@
 # wheel-n-deal
 
-A personal price tracker. You keep a watch list of products with target prices. One long-lived container checks each product every few hours over plain HTTP, records the price in SQLite, and sends an [ntfy](https://ntfy.sh) notification when a price drops below your target.
+A personal price tracker. You keep a watch list of products with target prices. One long-lived container checks each product every few hours over HTTP (with a headless-browser retry for pages that refuse it), records the price in SQLite, and sends an [ntfy](https://ntfy.sh) notification when a price drops below your target.
 
 ```
 watch list in SQLite (seeded once from config.yaml)
-  → polite fetch (httpx, honest User-Agent, one request at a time per site)
+  → polite fetch (httpx with browser headers, one request at a time per site)
+  → headless Chromium retry, once, only if the page was blocked
   → structured extraction (JSON-LD, Shopify .js, meta tags, per-site selectors)
   → learned selector (saved from an earlier LLM answer)
   → LLM fallback (only when everything above found no price)
@@ -12,16 +13,16 @@ watch list in SQLite (seeded once from config.yaml)
   → ntfy alert (once per drop below target), optional deal verdict, heartbeat ping
 ```
 
-## Politeness, and no bot evasion
+## Politeness and fetching
 
-wheel-n-deal behaves like a well-mannered visitor and does not try to get past a site that refuses it.
+wheel-n-deal fetches like an ordinary desktop browser and checks each site rarely.
 
-- Every request sends the User-Agent `wheel-n-deal/<version> (+personal price tracker)`. It is never rotated or spoofed.
+- Shop requests send a current desktop Chrome User-Agent with the matching browser headers (`Accept`, `Accept-Language: en-US`, `sec-ch-ua*`, `sec-fetch-*`). MiMo, ntfy and the heartbeat get the app's own User-Agent, `wheel-n-deal/<version> (+personal price tracker)`.
 - Each site (registrable domain) is checked at most once per `politeness.min_interval_hours` (default 6), with random jitter, and only one request runs at a time per site.
-- There are no stealth plugins, headless browsers, CAPTCHA solvers, or proxies.
-- When a site answers with 403, 429 or 503, serves a bot-wall or CAPTCHA page, or returns an empty body, the check is recorded as `status=blocked` and retried at the next normal slot, not sooner. Newly blocked items are reported in one ntfy summary.
+- When a site answers with 403, 429 or 503, serves a bot-wall or CAPTCHA page, or returns an empty body, that one item is retried once with headless Chromium (Playwright): Chrome User-Agent and client hints, 1920x1080 viewport, `en-US`, `America/Los_Angeles`, waiting for the network to go idle. The rendered HTML goes through the normal extraction below. If the browser is refused too, the check is recorded as `status=blocked` (or `error` if the browser failed) and tried again at the next normal slot, not sooner. Newly blocked items are reported in one ntfy summary.
+- CAPTCHAs are never solved, and no CAPTCHA-solving service is used.
 
-Some large retailers will block it. That is expected, and the troubleshooting section below covers it.
+Some large retailers may still block it. The troubleshooting section below covers that.
 
 ## How a price is found
 
@@ -113,7 +114,7 @@ shellcheck scripts/*.sh
 
 ## Deploy
 
-The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 512m`, runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted.
+The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 1536m` (headroom for headless Chromium, which is launched only for a blocked page and closed afterwards), `init: true` (reaps browser processes), runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted.
 
 One-time setup on the host, under `~/wheel-n-deal/`: create `config.yaml`, `.env`, and `data/`, all owned by uid 1000. If they are missing, Docker creates the bind mounts as root, and a missing `config.yaml` becomes a directory.
 
@@ -139,7 +140,7 @@ Each run logs one summary line (`checked / ok / blocked / failed`), plus one lin
 
 ## Troubleshooting
 
-**A site shows `blocked`.** The site refused a polite request. It may have returned 403, 429 or 503, or served a bot wall or CAPTCHA page. This is by design: wheel-n-deal will not evade it. Your options are:
+**A site shows `blocked`.** The site refused both the plain request and the headless browser: 403, 429 or 503, or a bot wall or CAPTCHA page. `GET /items?detail=1` (or the `block_reason` column) shows what each attempt got, e.g. `http 403; headless: bot wall (px-captcha)`. wheel-n-deal does not solve CAPTCHAs. Your options are:
 - Check whether the product is also sold on a store that serves structured data, such as a brand's own Shopify store, and watch that URL instead.
 - Remove the item, or accept that it updates only when the site lets it through.
 

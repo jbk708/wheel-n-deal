@@ -7,7 +7,7 @@ import respx
 
 from wheel_n_deal.check import check_item
 from wheel_n_deal.config import LLMConfig, WatchItem
-from wheel_n_deal.fetch import make_client
+from wheel_n_deal.fetch import FetchResult, FetchStatus, make_client
 from wheel_n_deal.llm import MiMo
 from wheel_n_deal.store import (
     Observation,
@@ -41,6 +41,10 @@ def _llm_answer(**overrides: object) -> dict:
     return {"choices": [{"message": {"role": "assistant", "content": content}}]}
 
 
+async def still_blocked(url: str) -> FetchResult:
+    return FetchResult(url, FetchStatus.BLOCKED, 403, reason="http 403")
+
+
 @pytest.fixture
 async def client():
     async with make_client() as c:
@@ -52,13 +56,15 @@ def conn(tmp_path):
     return open_store(tmp_path / "state.db")
 
 
-async def _check(client, conn, url: str, previous: list[Observation] = ()) -> tuple[Status, list]:
+async def _check(
+    client, conn, url: str, previous: list[Observation] = (), render=still_blocked
+) -> tuple[Status, list]:
     item = WatchItem(url=url, name="Thing", target_price=100)
     item_id = create_item(conn, item)
     for obs in previous:
         create_observation(conn, obs)
     mimo = MiMo(client, LLMConfig(base_url="https://llm.example/v1"), "k")
-    obs, _ = await check_item(client, conn, mimo, item_id, item, AT)
+    obs, _ = await check_item(client, conn, mimo, item_id, item, AT, render)
     assert obs == read_observations(conn, item_id, limit=1)[0]
     return obs.status, [obs]
 
@@ -86,9 +92,9 @@ async def test_check_item_returns_page_only_when_fetched(client, conn):
     html = (FIXTURES / "jsonld_product.html").read_text()
     with respx.mock:
         route = respx.get(url).respond(200, text=html)
-        assert (await check_item(client, conn, mimo, item_id, item, AT))[1] == html
+        assert (await check_item(client, conn, mimo, item_id, item, AT, still_blocked))[1] == html
         route.respond(403, text="denied")
-        assert (await check_item(client, conn, mimo, item_id, item, AT))[1] is None
+        assert (await check_item(client, conn, mimo, item_id, item, AT, still_blocked))[1] is None
 
 
 async def test_blocked_stores_blocked_without_price(client, conn):
@@ -99,7 +105,59 @@ async def test_blocked_stores_blocked_without_price(client, conn):
     assert route.call_count == 1
     assert status is Status.BLOCKED
     assert (obs.status, obs.price) == (Status.BLOCKED, None)
-    assert (obs.http_status, obs.block_reason) == (403, "http 403")
+    assert (obs.http_status, obs.block_reason) == (403, "http 403; headless: http 403")
+
+
+class _Renderer:
+    def __init__(self, result: FetchResult | None = None, html: str | None = None):
+        self.result, self.html, self.urls = result, html, []
+
+    async def __call__(self, url: str) -> FetchResult:
+        self.urls.append(url)
+        return self.result or FetchResult(url, FetchStatus.OK, 200, body=self.html)
+
+
+async def test_blocked_page_is_retried_once_headless_and_extracted(client, conn):
+    url = "https://www.sephora.com/product/serum-P427419"
+    render = _Renderer(html=(FIXTURES / "jsonld_product.html").read_text())
+    with respx.mock:
+        route = respx.get(url).respond(403, text="denied")
+        status, [obs] = await _check(client, conn, url, render=render)
+    assert route.call_count == 1
+    assert render.urls == [url]
+    assert status is Status.OK
+    assert (obs.price, obs.http_status, obs.block_reason) == (149.99, 200, None)
+
+
+async def test_headless_page_without_structured_price_goes_to_mimo(client, conn):
+    url = "https://shop.example/products/grinder"
+    render = _Renderer(html=NO_PRICE_PAGE)
+    with respx.mock:
+        respx.get(url).respond(200, text="<form action='/errors_page/validateCaptcha'></form>")
+        llm = respx.post(COMPLETIONS).respond(200, json=_llm_answer())
+        status, [obs] = await _check(client, conn, url, render=render)
+    assert llm.call_count == 1
+    assert (status, obs.price) == (Status.OK, 87.0)
+
+
+async def test_headless_error_is_error_with_both_reasons(client, conn):
+    url = "https://shop.example/products/grinder"
+    render = _Renderer(FetchResult(url, FetchStatus.ERROR, reason="net::ERR_TIMED_OUT"))
+    with respx.mock:
+        respx.get(url).respond(429)
+        status, [obs] = await _check(client, conn, url, render=render)
+    assert status is Status.ERROR
+    assert obs.block_reason == "http 429; headless: net::ERR_TIMED_OUT"
+
+
+@pytest.mark.parametrize("code", [200, 404])
+async def test_headless_only_runs_for_blocked_pages(client, conn, code):
+    url = "https://shop.example/products/grinder"
+    render = _Renderer(html="<title>x</title>")
+    with respx.mock:
+        respx.get(url).respond(code, text=(FIXTURES / "jsonld_product.html").read_text())
+        await _check(client, conn, url, render=render)
+    assert render.urls == []
 
 
 async def test_amazon_captcha_page_is_blocked_with_reason(client, conn):
@@ -111,7 +169,10 @@ async def test_amazon_captcha_page_is_blocked_with_reason(client, conn):
         status, [obs] = await _check(client, conn, url)
     assert llm.call_count == 0
     assert status is Status.BLOCKED
-    assert (obs.http_status, obs.block_reason) == (200, "bot wall (validatecaptcha)")
+    assert (obs.http_status, obs.block_reason) == (
+        403,
+        "bot wall (validatecaptcha); headless: http 403",
+    )
 
 
 async def test_fetch_error_stores_reason(client, conn):
@@ -242,15 +303,15 @@ async def test_learned_selector_skips_mimo_until_it_breaks(client, conn):
     with respx.mock:
         page = respx.get(url).respond(200, text=LEARNABLE_PAGE)
         llm = respx.post(COMPLETIONS).respond(200, json=_llm_answer())
-        first, _ = await check_item(client, conn, mimo, item_id, item, AT)
+        first, _ = await check_item(client, conn, mimo, item_id, item, AT, still_blocked)
         assert read_selector(conn, item_id) == "css:#buy > b:nth-of-type(1)"
 
-        second, _ = await check_item(client, conn, mimo, item_id, item, AT)
+        second, _ = await check_item(client, conn, mimo, item_id, item, AT, still_blocked)
         assert llm.call_count == 1
 
         page.respond(200, text=MOVED_PAGE)
         llm.respond(200, json=_llm_answer(price=79.0, evidence="Now $79.00"))
-        third, _ = await check_item(client, conn, mimo, item_id, item, AT)
+        third, _ = await check_item(client, conn, mimo, item_id, item, AT, still_blocked)
     assert llm.call_count == 2
     assert [o.price for o in (first, second, third)] == [87.0, 87.0, 79.0]
     assert all(o.status is Status.OK for o in (first, second, third))
@@ -301,10 +362,10 @@ async def test_broken_selector_with_mimo_down_is_dropped_and_stale(client, conn)
     with respx.mock:
         respx.get(url).respond(200, text=LEARNABLE_PAGE)
         respx.post(COMPLETIONS).respond(200, json=_llm_answer())
-        await check_item(client, conn, mimo, item_id, item, AT)
+        await check_item(client, conn, mimo, item_id, item, AT, still_blocked)
     with respx.mock:
         respx.get(url).respond(200, text=MOVED_PAGE)
         respx.post(COMPLETIONS).mock(side_effect=httpx.ConnectError("down"))
-        obs, _ = await check_item(client, conn, mimo, item_id, item, AT)
+        obs, _ = await check_item(client, conn, mimo, item_id, item, AT, still_blocked)
     assert (obs.status, obs.price) == (Status.STALE, 87.0)
     assert read_selector(conn, item_id) is None

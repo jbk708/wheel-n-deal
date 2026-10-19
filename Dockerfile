@@ -27,7 +27,13 @@ RUN groupadd --gid "$APP_GID" app \
 COPY --from=builder --chown=$APP_UID:$APP_GID /app /app
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
+# Headless fallback for blocked pages: Playwright's own Chromium (the version pinned by the
+# playwright package) plus its system libraries. Chromium only, no headless shell.
+RUN playwright install --with-deps --no-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 
 USER app
 WORKDIR /app

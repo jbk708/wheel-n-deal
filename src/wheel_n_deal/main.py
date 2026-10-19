@@ -17,9 +17,10 @@ from pathlib import Path
 import httpx
 
 from wheel_n_deal.api import start_api
-from wheel_n_deal.check import check_item
+from wheel_n_deal.browser import render
+from wheel_n_deal.check import Render, check_item
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
-from wheel_n_deal.fetch import canonical_url, make_client
+from wheel_n_deal.fetch import canonical_url, make_client, make_shop_client
 from wheel_n_deal.heartbeat import ping
 from wheel_n_deal.llm import MiMo, format_verdict
 from wheel_n_deal.notify import alert_on_price, blocked_message, publish
@@ -86,7 +87,9 @@ async def run_forever(
     config: Config,
     conn: sqlite3.Connection,
     client: httpx.AsyncClient,
+    shop: httpx.AsyncClient,
     secrets: Secrets,
+    render: Render,
     clock: Callable[[], float] = time.time,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     rng: random.Random | None = None,
@@ -94,7 +97,7 @@ async def run_forever(
     rng = rng or random.Random()
     interval_s = config.politeness.min_interval_hours * 3600
     jitter_s = config.politeness.jitter_minutes * 60
-    await seed_watch_list(conn, config, client)
+    await seed_watch_list(conn, config, shop)
     watched: set[int] = set()
     schedule: dict[str, float] = {}
 
@@ -105,7 +108,7 @@ async def run_forever(
         item_id = item_ids[item.url]
         was_blocked = _last_status(conn, item_id) is Status.BLOCKED
         checked_at = datetime.fromtimestamp(clock(), UTC).isoformat()
-        obs, page = await check_item(client, conn, mimo, item_id, item, checked_at)
+        obs, page = await check_item(shop, conn, mimo, item_id, item, checked_at, render)
         if obs.status is Status.BLOCKED and not was_blocked:
             newly_blocked.append(item.name)
 
@@ -159,10 +162,10 @@ async def _main(config: Config) -> None:
     conn = open_store(db_path)
     secrets = Secrets.from_env()
     start_api(db_path, secrets.api_token)
-    async with make_client() as client:
+    async with make_client() as client, make_shop_client() as shop:
         await asyncio.gather(
             touch_heartbeat(config.data_dir / "heartbeat"),
-            run_forever(config, conn, client, secrets),
+            run_forever(config, conn, client, shop, secrets, render),
         )
 
 

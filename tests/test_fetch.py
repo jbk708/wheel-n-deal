@@ -3,13 +3,15 @@ import pytest
 import respx
 
 from wheel_n_deal.fetch import (
-    USER_AGENT,
+    APP_USER_AGENT,
+    BROWSER_HEADERS,
     FetchStatus,
     block_reason,
     canonical_amazon_url,
     canonical_url,
     fetch,
     make_client,
+    make_shop_client,
 )
 
 PRODUCT_HTML = "<html><head><title>Grinder</title></head><body><h1>Grinder</h1></body></html>"
@@ -17,15 +19,48 @@ PRODUCT_HTML = "<html><head><title>Grinder</title></head><body><h1>Grinder</h1><
 
 @pytest.fixture
 async def client():
-    async with make_client() as c:
+    async with make_shop_client() as c:
         yield c
 
 
-def test_user_agent_is_honest_and_versioned():
-    assert USER_AGENT.startswith("wheel-n-deal/")
-    assert USER_AGENT.endswith(" (+personal price tracker)")
-    version = USER_AGENT.split("/", 1)[1].split(" ", 1)[0]
+def test_app_user_agent_names_the_app():
+    assert APP_USER_AGENT.startswith("wheel-n-deal/")
+    version = APP_USER_AGENT.split("/", 1)[1].split(" ", 1)[0]
     assert version[0].isdigit()
+
+
+def test_browser_headers_look_like_desktop_chrome():
+    ua = BROWSER_HEADERS["User-Agent"]
+    major = ua.split("Chrome/", 1)[1].split(".", 1)[0]
+    assert ua.startswith("Mozilla/5.0 (Windows NT 10.0; Win64; x64)") and "Headless" not in ua
+    assert f'"Google Chrome";v="{major}"' in BROWSER_HEADERS["sec-ch-ua"]
+    assert BROWSER_HEADERS["sec-ch-ua-platform"] == '"Windows"'
+    assert BROWSER_HEADERS["Accept-Language"].startswith("en-US")
+    assert BROWSER_HEADERS["Accept"].startswith("text/html")
+
+
+async def test_shop_client_decodes_brotli_and_zstd():
+    import brotli
+    import zstandard
+
+    async with make_shop_client() as shop:
+        with respx.mock:
+            respx.get("https://shop.example/br").respond(
+                200, content=brotli.compress(b"<h1>br</h1>"), headers={"content-encoding": "br"}
+            )
+            respx.get("https://shop.example/zstd").respond(
+                200,
+                content=zstandard.ZstdCompressor().compress(b"<h1>zstd</h1>"),
+                headers={"content-encoding": "zstd"},
+            )
+            assert (await fetch(shop, "https://shop.example/br")).body == "<h1>br</h1>"
+            assert (await fetch(shop, "https://shop.example/zstd")).body == "<h1>zstd</h1>"
+
+
+async def test_app_client_keeps_the_app_user_agent():
+    async with make_client() as app:
+        assert app.headers["user-agent"] == APP_USER_AGENT
+        assert "sec-ch-ua" not in app.headers
 
 
 @pytest.mark.parametrize(
@@ -77,13 +112,15 @@ def test_block_reason(status, body, blocked):
     assert (block_reason(status, body) is not None) is blocked
 
 
-async def test_fetch_ok_sends_honest_user_agent(client):
+async def test_fetch_ok_sends_browser_headers(client):
     with respx.mock:
         route = respx.get("https://shop.example/products/x").respond(200, text=PRODUCT_HTML)
         result = await fetch(client, "https://shop.example/products/x")
     assert result.status is FetchStatus.OK
     assert result.body == PRODUCT_HTML
-    assert route.calls.last.request.headers["user-agent"] == USER_AGENT
+    sent = route.calls.last.request.headers
+    for name, value in BROWSER_HEADERS.items():
+        assert sent[name] == value
 
 
 async def test_fetch_follows_redirects(client):

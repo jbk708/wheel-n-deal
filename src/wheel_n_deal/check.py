@@ -1,6 +1,8 @@
 import json
 import logging
 import sqlite3
+from collections.abc import Awaitable, Callable
+from dataclasses import replace
 
 import httpx
 
@@ -20,6 +22,8 @@ from wheel_n_deal.store import (
 )
 
 logger = logging.getLogger(__name__)
+
+Render = Callable[[str], Awaitable[FetchResult]]
 
 
 async def read_shopify_extraction(
@@ -118,6 +122,21 @@ async def _read_page(
     return await _read_with_mimo(conn, mimo, item_id, item, page, checked_at)
 
 
+async def _retry_headless(item: WatchItem, blocked: FetchResult, render: Render) -> FetchResult:
+    logger.warning("plain fetch blocked: %s (%s), retrying headless", item.name, blocked.reason)
+    rendered = await render(blocked.url)
+    logger.info(
+        "headless fetch: %s -> %s (http %s%s)",
+        item.name,
+        rendered.status.value,
+        rendered.http_status,
+        f", {rendered.reason}" if rendered.reason else "",
+    )
+    if rendered.status is FetchStatus.OK:
+        return rendered
+    return replace(rendered, reason=f"{blocked.reason}; headless: {rendered.reason}")
+
+
 async def check_item(
     client: httpx.AsyncClient,
     conn: sqlite3.Connection,
@@ -125,9 +144,12 @@ async def check_item(
     item_id: int,
     item: WatchItem,
     checked_at: str,
+    render: Render,
 ) -> tuple[Observation, str | None]:
     """Return the stored observation and, when the page was fetched, its HTML."""
     fetched = await fetch(client, item.url)
+    if fetched.status is FetchStatus.BLOCKED:
+        fetched = await _retry_headless(item, fetched, render)
     found = None
     reason = fetched.reason
     if fetched.status is FetchStatus.BLOCKED:
