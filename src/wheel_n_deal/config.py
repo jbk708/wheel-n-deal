@@ -36,11 +36,17 @@ class PolitenessConfig(StrictModel):
     jitter_minutes: float = Field(default=30, ge=0)
 
 
+class FetchConfig(StrictModel):
+    # Shop page fetches only (plain and headless); our own services always go direct.
+    proxy_url: HttpUrlStr | None = None
+
+
 class Config(StrictModel):
     watch: list[WatchItem] = []
     ntfy: NtfyConfig
     llm: LLMConfig
     politeness: PolitenessConfig = PolitenessConfig()
+    fetch: FetchConfig = FetchConfig()
     data_dir: Path = Path("/data")
     heartbeat_url: HttpUrlStr | None = None
 

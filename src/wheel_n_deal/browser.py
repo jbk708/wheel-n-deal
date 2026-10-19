@@ -21,6 +21,10 @@ NETWORK_IDLE_TIMEOUT_MS = 15_000
 LAUNCH_ARGS = [
     "--disable-blink-features=AutomationControlled",
     "--disable-dev-shm-usage",
+    # WebRTC may otherwise send UDP straight to STUN servers, revealing the real address
+    # behind the proxy.
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    "--webrtc-ip-handling-policy=disable_non_proxied_udp",
 ]
 # Makes navigator.userAgentData, navigator.platform and the sec-ch-ua headers agree with
 # the Windows Chrome User-Agent instead of reporting headless Linux.
@@ -45,10 +49,14 @@ USER_AGENT_OVERRIDE = {
 }
 
 
-async def render(url: str) -> FetchResult:
+async def render(url: str, proxy_url: str | None) -> FetchResult:
+    """Chromium never falls back to a direct connection when its proxy is down."""
+    proxy = {"server": proxy_url} if proxy_url else None
     try:
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(channel="chromium", args=LAUNCH_ARGS)
+            browser = await playwright.chromium.launch(
+                channel="chromium", args=LAUNCH_ARGS, proxy=proxy
+            )
             try:
                 context = await browser.new_context(
                     user_agent=BROWSER_USER_AGENT,

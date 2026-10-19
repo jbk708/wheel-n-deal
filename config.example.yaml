@@ -19,6 +19,8 @@ llm:
 politeness:
   min_interval_hours: 6 # never check the same site more often than this
   jitter_minutes: 30 # random delay added to each site's schedule
+# fetch:
+#   proxy_url: http://127.0.0.1:8888 # shop fetches only; if it is down, checks fail (no direct fallback)
 data_dir: /data # container bind mount; holds state.db
 # Optional: Uptime Kuma push URL, pinged (GET) after each successful run.
 # heartbeat_url: https://status.example/api/push/<token>?status=up&msg=OK&ping=

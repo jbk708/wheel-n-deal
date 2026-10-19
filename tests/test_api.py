@@ -153,6 +153,26 @@ def test_add_unresolvable_short_link_is_502(api, shops):
     assert api.get("/items", headers=AUTH).json() == []
 
 
+def test_add_resolves_short_links_through_the_proxy(db_path, local_proxy):
+    local_proxy.responses["http://a.co/d/abc"] = (
+        301,
+        {"Location": "https://www.amazon.com/dp/B0ABCDEF12?ref=x"},
+        "",
+    )
+    server = make_server(db_path, TOKEN, port=0, proxy_url=local_proxy.url)
+    threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True).start()
+    host, port = server.server_address[:2]
+    try:
+        with httpx.Client(base_url=f"http://{host}:{port}", timeout=5) as client:
+            item = {"url": "http://a.co/d/abc", "name": "A", "target_price": 5}
+            response = client.post("/items", headers=AUTH, json=item)
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert response.json()["url"] == "https://www.amazon.com/dp/B0ABCDEF12"
+    assert local_proxy.requests == ["http://a.co/d/abc"]
+
+
 def test_list_items_detail_adds_block_reason(api, db_path):
     conn = open_store(db_path)
     a = create_item(conn, WatchItem(url=URL_A, name="A", target_price=10))
@@ -281,5 +301,5 @@ def test_unknown_item_and_path_are_404(api):
 
 def test_start_api_disabled_without_token(db_path, caplog):
     caplog.set_level(logging.WARNING)
-    assert start_api(db_path, None) is None
+    assert start_api(db_path, None, None) is None
     assert "WND_API_TOKEN" in caplog.text

@@ -19,7 +19,7 @@ PRODUCT_HTML = "<html><head><title>Grinder</title></head><body><h1>Grinder</h1><
 
 @pytest.fixture
 async def client():
-    async with make_shop_client() as c:
+    async with make_shop_client(None) as c:
         yield c
 
 
@@ -43,7 +43,7 @@ async def test_shop_client_decodes_brotli_and_zstd():
     import brotli
     import zstandard
 
-    async with make_shop_client() as shop:
+    async with make_shop_client(None) as shop:
         with respx.mock:
             respx.get("https://shop.example/br").respond(
                 200, content=brotli.compress(b"<h1>br</h1>"), headers={"content-encoding": "br"}
@@ -213,3 +213,41 @@ async def test_canonical_url_needs_no_network_for_long_urls(client):
         assert await canonical_url(client, "https://shop.example/p?id=1") == (
             "https://shop.example/p?id=1"
         )
+
+
+async def test_shop_client_goes_through_the_proxy(local_proxy):
+    local_proxy.responses["http://shop.example/p"] = (200, {}, PRODUCT_HTML)
+    async with make_shop_client(local_proxy.url) as shop:
+        result = await fetch(shop, "http://shop.example/p")
+    assert result.status is FetchStatus.OK
+    assert local_proxy.requests == ["http://shop.example/p"]
+
+
+async def test_unreachable_proxy_is_an_error_without_direct_fallback(dead_proxy_url, local_proxy):
+    # The "shop" is reachable directly (it is the local server); a fallback would hit it.
+    target = f"{local_proxy.url}/p"
+    async with make_shop_client(dead_proxy_url) as shop:
+        result = await fetch(shop, target)
+    assert result.status is FetchStatus.ERROR
+    assert result.reason == "proxy unreachable (ConnectError)"
+    assert local_proxy.requests == []
+
+
+async def test_short_links_resolve_through_the_proxy(local_proxy):
+    local_proxy.responses["http://a.co/d/abc"] = (
+        301,
+        {"Location": "https://www.amazon.com/dp/B0ABCDEF12?ref=x"},
+        "",
+    )
+    async with make_shop_client(local_proxy.url) as shop:
+        assert await canonical_url(shop, "http://a.co/d/abc") == (
+            "https://www.amazon.com/dp/B0ABCDEF12"
+        )
+    assert local_proxy.requests == ["http://a.co/d/abc"]
+
+
+async def test_app_client_never_uses_the_shop_proxy(local_proxy, monkeypatch):
+    monkeypatch.setenv("HTTP_PROXY", local_proxy.url)
+    monkeypatch.setenv("HTTPS_PROXY", local_proxy.url)
+    async with make_client() as app, make_shop_client(None) as shop:
+        assert app._mounts == {} and shop._mounts == {}
