@@ -9,7 +9,10 @@ services:
     # reachable from this host only, so no ports are published.
     network_mode: host
     restart: unless-stopped
-    mem_limit: 512m
+    # Headroom for the headless Chromium fallback (one browser at a time, closed after use).
+    mem_limit: 1536m
+    # Reaps Chromium's child processes; the app itself is not an init process.
+    init: true
     env_file: .env
     environment:
       - TZ=${TZ:-America/Los_Angeles}

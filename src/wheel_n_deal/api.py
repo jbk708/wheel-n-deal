@@ -23,7 +23,7 @@ import httpx
 from pydantic import ValidationError
 
 from wheel_n_deal.config import WatchItem
-from wheel_n_deal.fetch import canonical_url, make_client
+from wheel_n_deal.fetch import canonical_url, make_shop_client
 from wheel_n_deal.store import (
     Observation,
     create_item,
@@ -94,7 +94,7 @@ def _parse_detail(query: str) -> bool:
 
 
 async def _canonical(url: str) -> str:
-    async with make_client() as client:
+    async with make_shop_client() as client:
         return await canonical_url(client, url)
 
 

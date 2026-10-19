@@ -8,21 +8,6 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
-### T19: Browser-like fetching with a headless fallback
-**Description:** Some shops (Sephora behind Akamai, Amazon) refuse a request that announces itself as a bot. Fetch with a current desktop Chrome User-Agent and matching browser headers. If a page is still blocked (403, 429, 503 or a bot wall), retry that one item once with headless Chromium (Playwright) and extract from the rendered HTML through the same pipeline. No CAPTCHA solving. Per-site spacing and jitter are unchanged.
-
-**Deliverables:**
-- [ ] Shop requests send a Chrome User-Agent with matching `Accept`, `Accept-Language: en-US`, `sec-ch-ua*` and `sec-fetch-*` headers
-- [ ] Blocked plain fetch → one headless Chromium attempt (real UA, desktop viewport, `en-US`, `America/Los_Angeles`, wait for network idle); the rendered HTML goes through the normal extraction
-- [ ] Observation records which attempt produced the result and why both failed if they did
-- [ ] Playwright pinned; only its Chromium is installed in the image; `mem_limit` raised for Chromium
-- [ ] README and CLAUDE.md describe the new fetching behaviour
-- [ ] Tests (the browser is injected, so tests never launch Chromium)
-
-**Dependencies:** T18
-
----
-
 ### T20: Fetch shop pages through an HTTP proxy
 **Description:** Optional `fetch.proxy_url` (e.g. a local VPN-backed proxy) used only for shop page fetches, plain and headless. MiMo, ntfy, the heartbeat and the local API never use it. If the proxy is configured but unreachable, the check fails as `error`; it never falls back to a direct connection.
 
@@ -53,6 +38,22 @@ One ticket per PR. Move completed tickets to **## Done**.
 ---
 
 ## Done
+
+### T19: Browser-like fetching with a headless fallback
+**Description:** Some shops (Sephora behind Akamai, Amazon) refuse a request that announces itself as a bot. Fetch with a current desktop Chrome User-Agent and matching browser headers. If a page is still blocked (403, 429, 503 or a bot wall), retry that one item once with headless Chromium (Playwright) and extract from the rendered HTML through the same pipeline. No CAPTCHA solving. Per-site spacing and jitter are unchanged.
+
+**Deliverables:**
+- [x] Shop requests send a Chrome User-Agent with matching `Accept`, `Accept-Language: en-US`, `sec-ch-ua*` and `sec-fetch-*` headers
+- [x] Blocked plain fetch → one headless Chromium attempt (real UA, desktop viewport, `en-US`, `America/Los_Angeles`, wait for network idle); the rendered HTML goes through the normal extraction
+- [x] Each attempt is logged; a failed observation's `block_reason` covers both attempts (e.g. `http 403; headless: http 403`)
+- [x] Playwright pinned (1.63.0, Chromium 153); only its Chromium is installed in the image (no headless shell); `mem_limit` 1536m and `init: true`
+- [x] `brotli` and `zstandard` so the advertised `Accept-Encoding` is decoded
+- [x] README and CLAUDE.md describe the new fetching behaviour
+- [x] Tests (the browser is injected, so tests never launch Chromium)
+
+**Dependencies:** T18
+
+---
 
 ### T18: Block detection, short links and block reasons
 **Description:** Amazon's CAPTCHA page now posts to `/errors_page/validateCaptcha`, which the bot-wall markers miss, so it reaches MiMo instead of being recorded as blocked. `a.co` answers `HEAD` with 404, so short links never resolve, and items are stored under the short link, so the same product can be added twice. Observations don't say why a check was blocked.

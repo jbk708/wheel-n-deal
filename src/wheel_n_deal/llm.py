@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from wheel_n_deal.config import LLMConfig, WatchItem
-from wheel_n_deal.fetch import USER_AGENT
+from wheel_n_deal.fetch import APP_USER_AGENT
 from wheel_n_deal.notify import money
 from wheel_n_deal.store import Observation, Status
 
@@ -197,7 +197,7 @@ class MiMo:
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": _MAX_TOKENS,
             },
-            headers={"Authorization": f"Bearer {self._api_key}", "User-Agent": USER_AGENT},
+            headers={"Authorization": f"Bearer {self._api_key}", "User-Agent": APP_USER_AGENT},
             timeout=_TIMEOUT,
         )
         logger.info(

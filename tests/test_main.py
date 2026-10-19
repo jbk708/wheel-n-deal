@@ -10,7 +10,7 @@ import httpx
 import respx
 
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
-from wheel_n_deal.fetch import make_client
+from wheel_n_deal.fetch import FetchResult, FetchStatus, make_client
 from wheel_n_deal.main import load_schedule, run_forever, seed_watch_list, touch_heartbeat
 from wheel_n_deal.store import (
     Observation,
@@ -49,6 +49,10 @@ def _config(tmp_path: Path, urls: list[str], target_price: float = 1) -> Config:
 
 class _Stop(Exception):
     pass
+
+
+async def still_blocked(url: str) -> FetchResult:
+    return FetchResult(url, FetchStatus.BLOCKED, 403, reason="http 403")
 
 
 async def test_seed_watch_list_imports_every_item_once(tmp_path):
@@ -96,7 +100,9 @@ async def test_run_forever_checks_items_from_the_database(tmp_path):
         respx.get(HEARTBEAT).respond(200)
         async with make_client() as client:
             try:
-                await run_forever(config, conn, client, Secrets(None, "t"), sleep=stop)
+                await run_forever(
+                    config, conn, client, client, Secrets(None, "t"), still_blocked, sleep=stop
+                )
             except _Stop:
                 pass
     assert a.call_count == 0
@@ -129,7 +135,9 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
                     config,
                     conn,
                     client,
+                    client,
                     Secrets(llm_api_key=None, ntfy_token="t"),
+                    still_blocked,
                     clock=lambda: now[0],
                     sleep=fake_sleep,
                     rng=random.Random(1),
@@ -183,7 +191,9 @@ async def _run_with_changes(
                     config,
                     conn,
                     client,
+                    client,
                     Secrets(None, "t"),
+                    still_blocked,
                     clock=lambda: now[0],
                     sleep=fake_sleep,
                     rng=random.Random(1),
@@ -249,7 +259,13 @@ async def test_price_drop_alert_carries_mimo_verdict(tmp_path):
         async with make_client() as client:
             try:
                 await run_forever(
-                    config, conn, client, Secrets(llm_api_key="k", ntfy_token="t"), sleep=stop
+                    config,
+                    conn,
+                    client,
+                    client,
+                    Secrets(llm_api_key="k", ntfy_token="t"),
+                    still_blocked,
+                    sleep=stop,
                 )
             except _Stop:
                 pass

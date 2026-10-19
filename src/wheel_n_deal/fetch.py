@@ -6,13 +6,42 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
-USER_AGENT = f"wheel-n-deal/{version('wheel-n-deal')} (+personal price tracker)"
+# For our own services (MiMo, ntfy, heartbeat); shops get BROWSER_HEADERS instead.
+APP_USER_AGENT = f"wheel-n-deal/{version('wheel-n-deal')} (+personal price tracker)"
+# Keep in step with the Chromium bundled by the pinned Playwright, so the plain request and
+# the headless fallback present the same browser.
+CHROME_MAJOR = 153
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    f" Chrome/{CHROME_MAJOR}.0.0.0 Safari/537.36"
+)
+SEC_CH_UA = (
+    f'"Google Chrome";v="{CHROME_MAJOR}", "Chromium";v="{CHROME_MAJOR}", "Not)A;Brand";v="24"'
+)
+BROWSER_HEADERS = {
+    "User-Agent": BROWSER_USER_AGENT,
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,"
+        "image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "sec-ch-ua": SEC_CH_UA,
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-User": "?1",
+    "Sec-Fetch-Dest": "document",
+    "Priority": "u=0, i",
+}
 TIMEOUT_SECONDS = 30
 SHORT_LINK_HOSTS = frozenset({"a.co", "amzn.to"})
 MAX_SHORT_LINK_HOPS = 5
 BLOCKED_HTTP_STATUSES = frozenset({403, 429, 503})
-# Markers of bot walls and CAPTCHA interstitials. We only detect them: a blocked page is
-# recorded and reported, never solved or worked around.
+# Markers of bot walls and CAPTCHA interstitials. A blocked page gets one headless retry;
+# CAPTCHAs are never solved.
 BOT_WALL_MARKERS = (
     "validatecaptcha",
     "enter the characters you see below",
@@ -42,7 +71,15 @@ class FetchResult:
 
 def make_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
+        headers={"User-Agent": APP_USER_AGENT},
+        timeout=TIMEOUT_SECONDS,
+        follow_redirects=True,
+    )
+
+
+def make_shop_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        headers=BROWSER_HEADERS,
         timeout=TIMEOUT_SECONDS,
         follow_redirects=True,
     )
@@ -88,15 +125,13 @@ async def fetch(client: httpx.AsyncClient, url: str) -> FetchResult:
         response = await client.get(url)
     except httpx.HTTPError as exc:
         return FetchResult(url=url, status=FetchStatus.ERROR, reason=type(exc).__name__)
-    final_url = str(response.url)
-    reason = block_reason(response.status_code, response.text)
+    return classify(str(response.url), response.status_code, response.text)
+
+
+def classify(url: str, http_status: int, body: str) -> FetchResult:
+    reason = block_reason(http_status, body)
     if reason:
-        return FetchResult(final_url, FetchStatus.BLOCKED, response.status_code, reason=reason)
-    if response.is_error:
-        return FetchResult(
-            final_url,
-            FetchStatus.ERROR,
-            response.status_code,
-            reason=f"http {response.status_code}",
-        )
-    return FetchResult(final_url, FetchStatus.OK, response.status_code, body=response.text)
+        return FetchResult(url, FetchStatus.BLOCKED, http_status, reason=reason)
+    if http_status >= 400:
+        return FetchResult(url, FetchStatus.ERROR, http_status, reason=f"http {http_status}")
+    return FetchResult(url, FetchStatus.OK, http_status, body=body)
