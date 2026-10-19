@@ -19,7 +19,7 @@ import httpx
 from wheel_n_deal.api import start_api
 from wheel_n_deal.check import check_item
 from wheel_n_deal.config import Config, Secrets, WatchItem, load_config
-from wheel_n_deal.fetch import make_client
+from wheel_n_deal.fetch import canonical_url, make_client
 from wheel_n_deal.heartbeat import ping
 from wheel_n_deal.llm import MiMo, format_verdict
 from wheel_n_deal.notify import alert_on_price, blocked_message, publish
@@ -41,9 +41,17 @@ _HEARTBEAT_SECONDS = 30
 _RELOAD_SECONDS = 60
 
 
-def seed_watch_list(conn: sqlite3.Connection, config: Config) -> None:
+async def seed_watch_list(
+    conn: sqlite3.Connection, config: Config, client: httpx.AsyncClient
+) -> None:
     for item in config.watch:
-        seed_item(conn, item)
+        try:
+            url = await canonical_url(client, item.url)
+        except httpx.HTTPError as exc:
+            # Seeding the short link would duplicate the item once it resolves.
+            logger.warning("not seeding %s yet: %s", item.url, type(exc).__name__)
+            continue
+        seed_item(conn, item.model_copy(update={"url": url}))
 
 
 def _last_status(conn: sqlite3.Connection, item_id: int) -> Status | None:
@@ -86,7 +94,7 @@ async def run_forever(
     rng = rng or random.Random()
     interval_s = config.politeness.min_interval_hours * 3600
     jitter_s = config.politeness.jitter_minutes * 60
-    seed_watch_list(conn, config)
+    await seed_watch_list(conn, config, client)
     watched: set[int] = set()
     schedule: dict[str, float] = {}
 

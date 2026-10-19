@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+import respx
 
 from wheel_n_deal.api import make_server, start_api
 from wheel_n_deal.config import WatchItem
@@ -122,6 +123,52 @@ def test_add_item(api, db_path):
     assert read_items(open_store(db_path)) == {
         body["id"]: WatchItem(url=URL_A, name="A", target_price=12.5)
     }
+
+
+@pytest.fixture
+def shops():
+    with respx.mock(assert_all_called=False) as mock:
+        mock.route(host="127.0.0.1").pass_through()
+        yield mock
+
+
+def test_add_canonicalizes_amazon_urls(api, shops):
+    long_url = "https://www.amazon.com/Belif-Aqua-Bomb/dp/B0CRS3N43Q/ref=sr_1_1?tag=x&th=1"
+    first = api.post("/items", headers=AUTH, json={"url": long_url, "name": "A", "target_price": 5})
+    assert first.status_code == 201
+    assert first.json()["url"] == "https://www.amazon.com/dp/B0CRS3N43Q"
+    shops.get("https://a.co/d/0e5nj345").respond(
+        301, headers={"location": "https://www.amazon.com/dp/B0CRS3N43Q?ref=cm_sw_r"}
+    )
+    short = {"url": "https://a.co/d/0e5nj345", "name": "A", "target_price": 5}
+    assert api.post("/items", headers=AUTH, json=short).status_code == 409
+
+
+def test_add_unresolvable_short_link_is_502(api, shops):
+    shops.get("https://a.co/d/x").mock(side_effect=httpx.ConnectError("down"))
+    response = api.post(
+        "/items", headers=AUTH, json={"url": "https://a.co/d/x", "name": "A", "target_price": 5}
+    )
+    assert response.status_code == 502
+    assert api.get("/items", headers=AUTH).json() == []
+
+
+def test_list_items_detail_adds_block_reason(api, db_path):
+    conn = open_store(db_path)
+    a = create_item(conn, WatchItem(url=URL_A, name="A", target_price=10))
+    create_observation(
+        conn,
+        Observation(
+            a, "2026-10-18T07:00:00+00:00", Status.BLOCKED, None, None, None, 403, "http 403"
+        ),
+    )
+    plain = api.get("/items", headers=AUTH).json()[0]
+    assert "last_block_reason" not in plain and "last_http_status" not in plain
+    detailed = api.get("/items?detail=1", headers=AUTH).json()[0]
+    assert detailed == plain | {"last_http_status": 403, "last_block_reason": "http 403"}
+    history = api.get(f"/items/{a}/history?detail=1", headers=AUTH).json()[0]
+    assert (history["http_status"], history["block_reason"]) == (403, "http 403")
+    assert "block_reason" not in api.get(f"/items/{a}/history", headers=AUTH).json()[0]
 
 
 def test_add_active_url_conflicts(api):

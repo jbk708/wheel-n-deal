@@ -22,6 +22,7 @@ from wheel_n_deal.store import (
     read_item_id,
     read_items,
     read_observations,
+    seed_item,
 )
 
 ROOT = Path(__file__).parent.parent
@@ -50,22 +51,38 @@ class _Stop(Exception):
     pass
 
 
-def test_seed_watch_list_imports_every_item_once(tmp_path):
+async def test_seed_watch_list_imports_every_item_once(tmp_path):
     config = load_config(ROOT / "config.example.yaml")
     conn = open_store(tmp_path / "state.db")
-    seed_watch_list(conn, config)
-    first = read_items(conn)
-    assert sorted(first.values(), key=lambda i: i.url) == sorted(config.watch, key=lambda i: i.url)
-    delete_item(conn, read_item_id(conn, config.watch[0].url), "2026-10-18T00:00:00+00:00")
-    seed_watch_list(conn, config)
+    async with make_client() as client:
+        await seed_watch_list(conn, config, client)
+        first = read_items(conn)
+        assert sorted(first.values(), key=lambda i: i.url) == sorted(
+            config.watch, key=lambda i: i.url
+        )
+        delete_item(conn, read_item_id(conn, config.watch[0].url), "2026-10-18T00:00:00+00:00")
+        await seed_watch_list(conn, config, client)
     assert config.watch[0] not in read_items(conn).values()
     assert len(read_items(conn)) == len(config.watch) - 1
+
+
+async def test_seed_canonicalizes_and_skips_unresolvable_short_links(tmp_path, caplog):
+    long_url = "https://www.amazon.com/Thing/dp/B0ABCDEF12?tag=x"
+    config = _config(tmp_path, [long_url, "https://a.co/d/broken"])
+    conn = open_store(tmp_path / "state.db")
+    async with make_client() as client:
+        with respx.mock:
+            respx.get("https://a.co/d/broken").mock(side_effect=httpx.ConnectError("down"))
+            await seed_watch_list(conn, config, client)
+    assert [i.url for i in read_items(conn).values()] == ["https://www.amazon.com/dp/B0ABCDEF12"]
+    assert "https://a.co/d/broken" in caplog.text
 
 
 async def test_run_forever_checks_items_from_the_database(tmp_path):
     config = _config(tmp_path, [URL_A])
     conn = open_store(tmp_path / "state.db")
-    seed_watch_list(conn, config)
+    for item in config.watch:
+        seed_item(conn, item)
     delete_item(conn, read_item_id(conn, URL_A), "2026-10-18T00:00:00+00:00")
     create_item(conn, WatchItem(url=URL_B, name="b", target_price=1))
 
@@ -203,7 +220,8 @@ async def test_removed_item_is_no_longer_checked(tmp_path):
 def test_restart_respects_interval_since_last_check(tmp_path):
     config = _config(tmp_path, [URL_A, URL_B])
     conn = open_store(tmp_path / "state.db")
-    seed_watch_list(conn, config)
+    for item in config.watch:
+        seed_item(conn, item)
     obs = Observation(
         read_item_id(conn, URL_A), "2026-10-18T10:00:00+00:00", Status.OK, 1.0, "USD", True
     )

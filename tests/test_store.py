@@ -119,6 +119,44 @@ def test_open_store_migrates_pre_notes_schema(tmp_path):
     open_store(path).close()
 
 
+def test_open_store_migrates_pre_block_reason_observations(tmp_path):
+    path = tmp_path / "state.db"
+    old = sqlite3.connect(path)
+    old.execute(
+        "CREATE TABLE items (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE,"
+        " name TEXT NOT NULL, target_price REAL NOT NULL, notes TEXT, removed_at TEXT)"
+    )
+    old.execute(
+        "CREATE TABLE observations (id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL,"
+        " checked_at TEXT NOT NULL, status TEXT NOT NULL, price REAL, currency TEXT,"
+        " in_stock INTEGER)"
+    )
+    old.execute(
+        "INSERT INTO items (url, name, target_price) VALUES ('https://a.example/1', 'A', 5)"
+    )
+    old.execute(
+        "INSERT INTO observations (item_id, checked_at, status, price, currency, in_stock)"
+        " VALUES (1, '2026-10-18T01:00:00+00:00', 'ok', 4.5, 'USD', 1)"
+    )
+    old.commit()
+    old.close()
+    conn = open_store(path)
+    assert read_observations(conn, 1) == [_obs(1, "2026-10-18T01:00:00+00:00", price=4.5)]
+    blocked = _obs(
+        1,
+        "2026-10-18T07:00:00+00:00",
+        status=Status.BLOCKED,
+        price=None,
+        currency=None,
+        in_stock=None,
+        http_status=403,
+        block_reason="http 403",
+    )
+    create_observation(conn, blocked)
+    assert read_observations(conn, 1, limit=1) == [blocked]
+    open_store(path).close()
+
+
 def test_observations_round_trip_newest_first(tmp_path):
     conn = open_store(tmp_path / "state.db")
     item = create_item(conn, _item("https://shop.example/p/1", "Thing", 20.0))
