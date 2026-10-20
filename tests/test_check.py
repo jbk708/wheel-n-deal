@@ -19,6 +19,9 @@ from wheel_n_deal.store import (
     read_selector,
 )
 
+# respx answers before anything reaches this address.
+PROXY = "http://proxy.invalid:8888"
+
 FIXTURES = Path(__file__).parent / "fixtures"
 AT = "2026-10-18T12:00:00+00:00"
 COMPLETIONS = "https://llm.example/v1/chat/completions"
@@ -47,7 +50,7 @@ async def still_blocked(url: str) -> FetchResult:
 
 @pytest.fixture
 async def client():
-    async with make_shop_client(None) as c:
+    async with make_shop_client(PROXY) as c:
         yield c
 
 

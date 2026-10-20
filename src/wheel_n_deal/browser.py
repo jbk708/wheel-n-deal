@@ -14,6 +14,7 @@ from wheel_n_deal.fetch import (
     FetchResult,
     FetchStatus,
     classify,
+    require_proxy,
 )
 
 NAVIGATION_TIMEOUT_MS = 45_000
@@ -49,9 +50,13 @@ USER_AGENT_OVERRIDE = {
 }
 
 
-async def render(url: str, proxy_url: str | None) -> FetchResult:
-    """Chromium never falls back to a direct connection when its proxy is down."""
-    proxy = {"server": proxy_url} if proxy_url else None
+async def render(url: str, proxy_url: str) -> FetchResult:
+    """Chromium never falls back to a direct connection when its proxy is down.
+
+    Playwright also drops Chromium's implicit loopback bypass, so loopback URLs go to the
+    proxy as well instead of reaching this host's services.
+    """
+    proxy = {"server": require_proxy(proxy_url)}
     try:
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(

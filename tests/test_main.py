@@ -25,6 +25,9 @@ from wheel_n_deal.store import (
     seed_item,
 )
 
+# respx answers before anything reaches this address.
+PROXY = "http://proxy.invalid:8888"
+
 ROOT = Path(__file__).parent.parent
 URL_A = "https://shop.example/products/a"
 URL_B = "https://shop.example/products/b"
@@ -42,6 +45,7 @@ def _config(tmp_path: Path, urls: list[str], target_price: float = 1) -> Config:
             "heartbeat_url": HEARTBEAT,
             "llm": {"base_url": "https://llm.example/v1"},
             "politeness": {"min_interval_hours": 6, "jitter_minutes": 0},
+            "fetch": {"proxy_url": PROXY},
             "data_dir": str(tmp_path),
         }
     )
@@ -58,7 +62,7 @@ async def still_blocked(url: str) -> FetchResult:
 async def test_seed_watch_list_imports_every_item_once(tmp_path):
     config = load_config(ROOT / "config.example.yaml")
     conn = open_store(tmp_path / "state.db")
-    async with make_shop_client(None) as client:
+    async with make_shop_client(PROXY) as client:
         await seed_watch_list(conn, config, client)
         first = read_items(conn)
         assert sorted(first.values(), key=lambda i: i.url) == sorted(
@@ -74,7 +78,7 @@ async def test_seed_canonicalizes_and_skips_unresolvable_short_links(tmp_path, c
     long_url = "https://www.amazon.com/Thing/dp/B0ABCDEF12?tag=x"
     config = _config(tmp_path, [long_url, "https://a.co/d/broken"])
     conn = open_store(tmp_path / "state.db")
-    async with make_shop_client(None) as client:
+    async with make_shop_client(PROXY) as client:
         with respx.mock:
             respx.get("https://a.co/d/broken").mock(side_effect=httpx.ConnectError("down"))
             await seed_watch_list(conn, config, client)
@@ -98,7 +102,7 @@ async def test_run_forever_checks_items_from_the_database(tmp_path):
         b = respx.get(URL_B).respond(429)
         respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client, make_shop_client(None) as shop:
+        async with make_client() as client, make_shop_client(PROXY) as shop:
             try:
                 await run_forever(
                     config, conn, client, shop, Secrets(None, "t"), still_blocked, sleep=stop
@@ -129,7 +133,7 @@ async def test_run_forever_checks_then_sleeps_until_next_slot(tmp_path, caplog):
         respx.get(URL_B).respond(429)
         ntfy = respx.post("https://ntfy.example/").respond(200)
         heartbeat = respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client, make_shop_client(None) as shop:
+        async with make_client() as client, make_shop_client(PROXY) as shop:
             try:
                 await run_forever(
                     config,
@@ -185,7 +189,7 @@ async def _run_with_changes(
         respx.get(url__regex=r"https://(shop|other)\.example/.*").mock(side_effect=record)
         respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client, make_shop_client(None) as shop:
+        async with make_client() as client, make_shop_client(PROXY) as shop:
             try:
                 await run_forever(
                     config,
@@ -256,7 +260,7 @@ async def test_price_drop_alert_carries_mimo_verdict(tmp_path):
         llm = respx.post("https://llm.example/v1/chat/completions").respond(200, json=completion)
         ntfy = respx.post("https://ntfy.example/").respond(200)
         respx.get(HEARTBEAT).respond(200)
-        async with make_client() as client, make_shop_client(None) as shop:
+        async with make_client() as client, make_shop_client(PROXY) as shop:
             try:
                 await run_forever(
                     config,

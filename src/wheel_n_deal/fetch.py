@@ -70,7 +70,7 @@ class FetchResult:
 
 
 # trust_env=False: proxy environment variables must never reroute either client. Shops go
-# through fetch.proxy_url only; our own services always go direct.
+# through fetch.proxy_url only (required); our own services always go direct.
 def make_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         headers={"User-Agent": APP_USER_AGENT},
@@ -80,19 +80,24 @@ def make_client() -> httpx.AsyncClient:
     )
 
 
+def require_proxy(proxy_url: str | None) -> str:
+    if not proxy_url:
+        raise ValueError("shop fetches need fetch.proxy_url; refusing to fetch directly")
+    return proxy_url
+
+
 class ShopClient(httpx.AsyncClient):
-    def __init__(self, proxy_url: str | None) -> None:
+    def __init__(self, proxy_url: str) -> None:
         super().__init__(
             headers=BROWSER_HEADERS,
             timeout=TIMEOUT_SECONDS,
             follow_redirects=True,
-            proxy=proxy_url,
+            proxy=require_proxy(proxy_url),
             trust_env=False,
         )
-        self.proxy_url = proxy_url
 
 
-def make_shop_client(proxy_url: str | None) -> ShopClient:
+def make_shop_client(proxy_url: str) -> ShopClient:
     return ShopClient(proxy_url)
 
 
@@ -135,10 +140,8 @@ async def fetch(client: ShopClient, url: str) -> FetchResult:
         url = await canonical_url(client, url)
         response = await client.get(url)
     except (httpx.ProxyError, httpx.ConnectError) as exc:
-        # Through a proxy every connection is to the proxy, so this means it is down.
-        reason = type(exc).__name__
-        if client.proxy_url:
-            reason = f"proxy unreachable ({reason})"
+        # Every connection is to the proxy, so this means it is down.
+        reason = f"proxy unreachable ({type(exc).__name__})"
         return FetchResult(url, FetchStatus.ERROR, reason=reason)
     except httpx.HTTPError as exc:
         return FetchResult(url=url, status=FetchStatus.ERROR, reason=type(exc).__name__)

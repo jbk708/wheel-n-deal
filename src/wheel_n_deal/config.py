@@ -37,8 +37,9 @@ class PolitenessConfig(StrictModel):
 
 
 class FetchConfig(StrictModel):
-    # Shop page fetches only (plain and headless); our own services always go direct.
-    proxy_url: HttpUrlStr | None = None
+    # Required: shop page fetches (plain and headless) never leave without it, so a config
+    # mistake can't expose the household IP. Our own services always go direct.
+    proxy_url: HttpUrlStr
 
 
 class Config(StrictModel):
@@ -46,7 +47,7 @@ class Config(StrictModel):
     ntfy: NtfyConfig
     llm: LLMConfig
     politeness: PolitenessConfig = PolitenessConfig()
-    fetch: FetchConfig = FetchConfig()
+    fetch: FetchConfig
     data_dir: Path = Path("/data")
     heartbeat_url: HttpUrlStr | None = None
 

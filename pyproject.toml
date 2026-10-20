@@ -1,6 +1,6 @@
 [project]
 name = "wheel-n-deal"
-version = "2.2.0"
+version = "3.0.0"
 description = "Personal price tracker: polite fetch, structured price extraction, ntfy alerts."
 requires-python = ">=3.12"
 license = { text = "GNU General Public License v3.0" }
