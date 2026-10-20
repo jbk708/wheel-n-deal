@@ -8,6 +8,20 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Open
 
+### T21: Require the shop proxy
+**Description:** `fetch.proxy_url` is optional, so a config without it sends every shop fetch straight from the household IP. Make it required: startup fails with a clear error when it is unset, and no code path (plain request, short-link resolution at seed or add time, Shopify product JSON, headless Chromium) can fetch a shop page without it. Headless Chromium must not bypass the proxy for loopback either. MiMo, ntfy, the heartbeat and the local API stay direct (they are our own services, not shops).
+
+**Deliverables:**
+- [ ] `fetch.proxy_url` required in config; a missing `fetch` section or `proxy_url` fails startup with an error naming it
+- [ ] Shop client and headless Chromium refuse to start without a proxy URL
+- [ ] Headless Chromium sends loopback requests through the proxy too (no implicit `<-loopback>` bypass)
+- [ ] No "direct (no proxy)" mode left in code, logs or docs
+- [ ] README config table, `config.example.yaml`, CLAUDE.md rule
+- [ ] Tests (written first)
+- [ ] Version 3.0.0 (configs without `fetch.proxy_url` no longer start)
+
+**Dependencies:** T20
+
 ### T14: Purge the legacy SQLite file from git history
 **Description:** `main` no longer tracks `backend/wheel_n_deal.db` (untracked in T1, `*.db` ignored), but this repo is public and older commits still contain a version of that file with personal data (a user row with a phone number, plus email and password-hash columns). Removing it needs a history rewrite, which **requires the owner's explicit approval** before anyone starts.
 
