@@ -23,6 +23,21 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Done
 
+### T22: Harden the container
+**Description:** The container keeps Docker's default capabilities, can gain privileges, has no process limit and a writable root filesystem. It runs as `app` and never needs any of that: Playwright starts Chromium with `--no-sandbox`, and everything persistent lives in `./data`.
+
+**Deliverables:**
+- [x] `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, no `cap_add`
+- [x] `pids_limit: 512` (Chromium threads count; one heavy page peaked near 200), `mem_limit` stays 1536m
+- [x] `read_only: true` with tmpfs `/tmp` (Chromium shared memory) and `/home/app` (crashpad needs a writable `$HOME`)
+- [x] Host networking kept; shop fetches still only through `fetch.proxy_url`
+- [x] Tests on `compose.yaml`; README
+- [x] Version 3.0.1
+
+**Dependencies:** none
+
+---
+
 ### T21: Require the shop proxy
 **Description:** `fetch.proxy_url` is optional, so a config without it sends every shop fetch straight from the household IP. Make it required: startup fails with a clear error when it is unset, and no code path (plain request, short-link resolution at seed or add time, Shopify product JSON, headless Chromium) can fetch a shop page without it. Headless Chromium must not bypass the proxy for loopback either. MiMo, ntfy, the heartbeat and the local API stay direct (they are our own services, not shops).
 
