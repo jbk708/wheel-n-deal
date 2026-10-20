@@ -19,6 +19,9 @@ from wheel_n_deal.store import (
     read_items,
 )
 
+# respx answers before anything reaches this address.
+PROXY = "http://proxy.invalid:8888"
+
 TOKEN = "test-api-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 URL_A = "https://shop.example/products/a"
@@ -34,7 +37,7 @@ def db_path(tmp_path):
 
 @pytest.fixture
 def api(db_path):
-    server = make_server(db_path, TOKEN, port=0)
+    server = make_server(db_path, TOKEN, PROXY, port=0)
     thread = threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True)
     thread.start()
     host, port = server.server_address[:2]
@@ -51,7 +54,7 @@ def _obs(item_id: int, at: str, status: Status = Status.OK, price: float | None 
 
 
 def test_binds_loopback_only(db_path):
-    server = make_server(db_path, TOKEN, port=0)
+    server = make_server(db_path, TOKEN, PROXY, port=0)
     assert server.server_address[0] == "127.0.0.1"
     server.server_close()
 
@@ -159,7 +162,7 @@ def test_add_resolves_short_links_through_the_proxy(db_path, local_proxy):
         {"Location": "https://www.amazon.com/dp/B0ABCDEF12?ref=x"},
         "",
     )
-    server = make_server(db_path, TOKEN, port=0, proxy_url=local_proxy.url)
+    server = make_server(db_path, TOKEN, local_proxy.url, port=0)
     threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True).start()
     host, port = server.server_address[:2]
     try:
@@ -301,5 +304,5 @@ def test_unknown_item_and_path_are_404(api):
 
 def test_start_api_disabled_without_token(db_path, caplog):
     caplog.set_level(logging.WARNING)
-    assert start_api(db_path, None, None) is None
+    assert start_api(db_path, None, PROXY) is None
     assert "WND_API_TOKEN" in caplog.text

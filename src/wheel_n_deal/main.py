@@ -162,7 +162,7 @@ async def _main(config: Config) -> None:
     secrets = Secrets.from_env()
     proxy_url = config.fetch.proxy_url
     start_api(db_path, secrets.api_token, proxy_url)
-    logger.info("shop fetches %s", "via proxy" if proxy_url else "direct (no proxy)")
+    logger.info("shop fetches via fetch.proxy_url")
     async with make_client() as client, make_shop_client(proxy_url) as shop:
         await asyncio.gather(
             touch_heartbeat(config.data_dir / "heartbeat"),

@@ -41,6 +41,7 @@ def test_watch_is_optional(tmp_path):
     text = """
 ntfy: {url: https://ntfy.example}
 llm: {base_url: https://llm.example/v1}
+fetch: {proxy_url: http://127.0.0.1:8888}
 """
     assert load_config(_write(tmp_path, text)).watch == []
 
@@ -60,6 +61,7 @@ def test_non_positive_target_rejected(tmp_path):
     text = """
 ntfy: {url: https://ntfy.example}
 llm: {base_url: https://llm.example/v1}
+fetch: {proxy_url: http://127.0.0.1:8888}
 watch:
   - {url: https://shop.example/p/1, name: Thing, target_price: 0}
 """
@@ -71,6 +73,7 @@ def test_non_http_url_rejected(tmp_path):
     text = """
 ntfy: {url: https://ntfy.example}
 llm: {base_url: https://llm.example/v1}
+fetch: {proxy_url: http://127.0.0.1:8888}
 watch:
   - {url: "file:///etc/passwd", name: Thing, target_price: 5}
 """
@@ -82,6 +85,7 @@ def test_duplicate_urls_rejected(tmp_path):
     text = """
 ntfy: {url: https://ntfy.example}
 llm: {base_url: https://llm.example/v1}
+fetch: {proxy_url: http://127.0.0.1:8888}
 watch:
   - {url: https://shop.example/p/1, name: A, target_price: 5}
   - {url: https://shop.example/p/1, name: B, target_price: 6}
@@ -94,6 +98,7 @@ def test_minimal_config_defaults(tmp_path):
     text = """
 ntfy: {url: https://ntfy.example}
 llm: {base_url: https://llm.example/v1}
+fetch: {proxy_url: http://127.0.0.1:8888}
 watch:
   - {url: https://shop.example/p/1, name: Thing, target_price: 19.99}
 heartbeat_url: https://kuma.example/api/push/x
@@ -129,12 +134,23 @@ def test_secrets_repr_hides_values():
     assert "apitok" not in repr(secrets)
 
 
-def test_fetch_proxy_defaults_off_and_loads(tmp_path):
-    assert load_config(ROOT / "config.example.yaml").fetch.proxy_url is None
-    text = _example() + "\nfetch:\n  proxy_url: http://127.0.0.1:8888\n"
-    assert load_config(_write(tmp_path, text)).fetch.proxy_url == "http://127.0.0.1:8888"
+def test_example_config_sets_the_proxy():
+    assert load_config(ROOT / "config.example.yaml").fetch.proxy_url == "http://127.0.0.1:8888"
+
+
+def test_missing_fetch_section_is_rejected(tmp_path):
+    text = _example().replace("fetch:\n  proxy_url: http://127.0.0.1:8888", "")
+    assert "fetch:" not in text
+    with pytest.raises(ValidationError, match="fetch"):
+        load_config(_write(tmp_path, text))
+
+
+def test_missing_proxy_url_is_rejected(tmp_path):
+    text = _example().replace("  proxy_url: http://127.0.0.1:8888", "  {}")
+    with pytest.raises(ValidationError, match="proxy_url"):
+        load_config(_write(tmp_path, text))
 
 
 def test_fetch_proxy_must_be_http_url(tmp_path):
     with pytest.raises(ValidationError):
-        load_config(_write(tmp_path, _example() + "\nfetch:\n  proxy_url: 127.0.0.1:8888\n"))
+        load_config(_write(tmp_path, _example().replace("http://127.0.0.1:8888", "127.0.0.1:8888")))

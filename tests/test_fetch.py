@@ -14,12 +14,15 @@ from wheel_n_deal.fetch import (
     make_shop_client,
 )
 
+# respx answers before anything reaches this address.
+PROXY = "http://proxy.invalid:8888"
+
 PRODUCT_HTML = "<html><head><title>Grinder</title></head><body><h1>Grinder</h1></body></html>"
 
 
 @pytest.fixture
 async def client():
-    async with make_shop_client(None) as c:
+    async with make_shop_client(PROXY) as c:
         yield c
 
 
@@ -43,7 +46,7 @@ async def test_shop_client_decodes_brotli_and_zstd():
     import brotli
     import zstandard
 
-    async with make_shop_client(None) as shop:
+    async with make_shop_client(PROXY) as shop:
         with respx.mock:
             respx.get("https://shop.example/br").respond(
                 200, content=brotli.compress(b"<h1>br</h1>"), headers={"content-encoding": "br"}
@@ -215,6 +218,12 @@ async def test_canonical_url_needs_no_network_for_long_urls(client):
         )
 
 
+@pytest.mark.parametrize("proxy_url", [None, ""])
+def test_shop_client_requires_a_proxy(proxy_url):
+    with pytest.raises(ValueError, match="proxy"):
+        make_shop_client(proxy_url)
+
+
 async def test_shop_client_goes_through_the_proxy(local_proxy):
     local_proxy.responses["http://shop.example/p"] = (200, {}, PRODUCT_HTML)
     async with make_shop_client(local_proxy.url) as shop:
@@ -246,8 +255,11 @@ async def test_short_links_resolve_through_the_proxy(local_proxy):
     assert local_proxy.requests == ["http://a.co/d/abc"]
 
 
-async def test_app_client_never_uses_the_shop_proxy(local_proxy, monkeypatch):
+async def test_proxy_environment_variables_are_ignored(local_proxy, dead_proxy_url, monkeypatch):
     monkeypatch.setenv("HTTP_PROXY", local_proxy.url)
     monkeypatch.setenv("HTTPS_PROXY", local_proxy.url)
-    async with make_client() as app, make_shop_client(None) as shop:
-        assert app._mounts == {} and shop._mounts == {}
+    async with make_client() as app, make_shop_client(dead_proxy_url) as shop:
+        assert app._mounts == {}
+        result = await fetch(shop, "http://shop.example/p")
+    assert result.reason == "proxy unreachable (ConnectError)"
+    assert local_proxy.requests == []
