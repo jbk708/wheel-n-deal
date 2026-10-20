@@ -11,6 +11,18 @@ services:
     restart: unless-stopped
     # Headroom for the headless Chromium fallback (one browser at a time, closed after use).
     mem_limit: 1536m
+    # Chromium threads count too: one heavy page peaked near 200.
+    pids_limit: 512
+    # The app runs unprivileged and Playwright starts Chromium with --no-sandbox,
+    # so no capability is needed.
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      # Chromium's shared memory (--disable-dev-shm-usage) and its profile.
+      - /tmp:size=256m
+      # Chromium's crashpad handler won't start without a writable $HOME.
+      - /home/app:size=64m,uid=${APP_UID:-1000},gid=${APP_GID:-1000}
     # Reaps Chromium's child processes; the app itself is not an init process.
     init: true
     env_file: .env

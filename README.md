@@ -116,7 +116,7 @@ shellcheck scripts/*.sh
 
 ## Deploy
 
-The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 1536m` (headroom for headless Chromium, which is launched only for a blocked page and closed afterwards), `init: true` (reaps browser processes), runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted.
+The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 1536m` (headroom for headless Chromium, which is launched only for a blocked page and closed afterwards), `pids_limit: 512` (Chromium's threads count; one heavy page peaked near 200), `init: true` (reaps browser processes), runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted. It drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem; only `/tmp` and `/home/app` (Chromium's crashpad handler needs a writable `$HOME`) are tmpfs.
 
 One-time setup on the host, under `~/wheel-n-deal/`: create `config.yaml`, `.env`, and `data/`, all owned by uid 1000. If they are missing, Docker creates the bind mounts as root, and a missing `config.yaml` becomes a directory.
 
