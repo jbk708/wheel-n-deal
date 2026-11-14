@@ -2,7 +2,7 @@
 
 A browser is launched per call and closed afterwards: it is only needed for the occasional
 blocked page, and keeping one alive would hold a few hundred MB between checks. Each launch
-gets a fresh Linux Firefox fingerprint whose timezone and locale match the proxy's exit IP.
+gets a fresh Linux Firefox fingerprint whose timezone matches the proxy's exit IP.
 """
 
 from camoufox.async_api import AsyncCamoufox
@@ -18,8 +18,11 @@ CAMOUFOX_OPTIONS = {
     # The host is Linux: claiming another OS makes Camoufox randomise canvas and WebGL
     # readback to hide the real one, which itself reads as a privacy-hardened browser.
     "os": "linux",
-    # Timezone, locale and geolocation from the proxy's exit IP, not this host.
+    # Timezone and geolocation from the proxy's exit IP, not this host.
     "geoip": True,
+    # GeoIP alone picks a locale from the exit country's language mix (es-US seen in the
+    # US); pin English to match the plain request's Accept-Language.
+    "locale": "en-US",
     # WebRTC may otherwise send UDP straight to STUN servers, revealing the real address
     # behind the proxy.
     "block_webrtc": True,
