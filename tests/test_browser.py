@@ -62,6 +62,10 @@ def test_fingerprint_follows_the_proxy_exit_not_this_host():
     assert CAMOUFOX_OPTIONS["geoip"] is True
 
 
+def test_pages_come_back_in_english():
+    assert CAMOUFOX_OPTIONS["locale"] == "en-US"
+
+
 def test_loopback_is_not_exempt_from_the_proxy():
     prefs = CAMOUFOX_OPTIONS["firefox_user_prefs"]
     assert prefs["network.proxy.allow_hijacking_localhost"] is True

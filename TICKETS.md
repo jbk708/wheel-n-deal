@@ -23,6 +23,15 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Done
 
+### T24: Pin the headless locale to en-US
+**Description:** With GeoIP on, Camoufox picks the locale from the exit country's language mix; a US exit produced `es-US`, so pages could render in Spanish and disagree with the plain request's `Accept-Language: en-US`.
+
+**Deliverables:**
+- [x] `locale: en-US` in `CAMOUFOX_OPTIONS` (GeoIP still sets timezone and geolocation)
+- [x] Test; README, CLAUDE.md; version 3.1.1
+
+**Dependencies:** T23
+
 ### T23: Camoufox for the headless retry
 **Description:** Blocks have been climbing since 2026-11-05 (1-5 a day, all 403/429 refused by both the plain request and headless Chromium). Swap the headless fallback from Playwright's Chromium to Camoufox, an anti-detect Firefox, so the retry presents a consistent real-browser fingerprint whose timezone and locale match the VPN exit.
 
