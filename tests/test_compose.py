@@ -26,7 +26,7 @@ def test_root_filesystem_is_read_only_with_writable_scratch():
     service = _service()
     assert service["read_only"] is True
     mounts = [entry.split(":", 1)[0] for entry in service["tmpfs"]]
-    # Chromium's crashpad handler needs a writable $HOME, its shared memory lives in /tmp.
+    # The browser needs a writable $HOME (~/.camoufox) and /tmp for its profile.
     assert mounts == ["/tmp", "/home/app"]
 
 

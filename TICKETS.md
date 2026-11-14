@@ -23,6 +23,18 @@ One ticket per PR. Move completed tickets to **## Done**.
 
 ## Done
 
+### T23: Camoufox for the headless retry
+**Description:** Blocks have been climbing since 2026-11-05 (1-5 a day, all 403/429 refused by both the plain request and headless Chromium). Swap the headless fallback from Playwright's Chromium to Camoufox, an anti-detect Firefox, so the retry presents a consistent real-browser fingerprint whose timezone and locale match the VPN exit.
+
+**Deliverables:**
+- [x] `browser.render` launches Camoufox (`camoufox[geoip]` 0.5.9, browser build 158.0.1-beta.41 pinned in the Dockerfile); same `render(url, proxy_url) -> FetchResult` contract
+- [x] Linux fingerprint (host OS; claiming another makes Camoufox noise canvas/WebGL), GeoIP from the proxy exit, WebRTC blocked, loopback not exempt from the proxy
+- [x] Image: Firefox system libraries, Camoufox under `XDG_CACHE_HOME=/opt/cache` (outside the tmpfs `$HOME`), fontconfig pre-generated so the root stays read-only
+- [x] Tests; verified in the hardened container through a proxy (loopback included)
+- [x] README, CLAUDE.md; version 3.1.0
+
+**Dependencies:** none
+
 ### T22: Harden the container
 **Description:** The container keeps Docker's default capabilities, can gain privileges, has no process limit and a writable root filesystem. It runs as `app` and never needs any of that: Playwright starts Chromium with `--no-sandbox`, and everything persistent lives in `./data`.
 
