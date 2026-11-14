@@ -5,7 +5,7 @@ A personal price tracker. You keep a watch list of products with target prices. 
 ```
 watch list in SQLite (seeded once from config.yaml)
   → polite fetch (httpx with browser headers, one request at a time per site)
-  → headless Chromium retry, once, only if the page was blocked
+  → headless Camoufox retry, once, only if the page was blocked
   → structured extraction (JSON-LD, Shopify .js, meta tags, per-site selectors)
   → learned selector (saved from an earlier LLM answer)
   → LLM fallback (only when everything above found no price)
@@ -19,9 +19,9 @@ wheel-n-deal fetches like an ordinary desktop browser and checks each site rarel
 
 - Shop requests send a current desktop Chrome User-Agent with the matching browser headers (`Accept`, `Accept-Language: en-US`, `sec-ch-ua*`, `sec-fetch-*`). MiMo, ntfy and the heartbeat get the app's own User-Agent, `wheel-n-deal/<version> (+personal price tracker)`.
 - Each site (registrable domain) is checked at most once per `politeness.min_interval_hours` (default 6), with random jitter, and only one request runs at a time per site.
-- When a site answers with 403, 429 or 503, serves a bot-wall or CAPTCHA page, or returns an empty body, that one item is retried once with headless Chromium (Playwright): Chrome User-Agent and client hints, 1920x1080 viewport, `en-US`, `America/Los_Angeles`, waiting for the network to go idle. The rendered HTML goes through the normal extraction below. If the browser is refused too, the check is recorded as `status=blocked` (or `error` if the browser failed) and tried again at the next normal slot, not sooner. Newly blocked items are reported in one ntfy summary.
+- When a site answers with 403, 429 or 503, serves a bot-wall or CAPTCHA page, or returns an empty body, that one item is retried once with headless [Camoufox](https://github.com/daijro/camoufox), an anti-detect Firefox driven through Playwright: each launch gets a fresh, internally consistent Linux Firefox fingerprint, with timezone, locale and geolocation taken from the proxy's exit IP (looked up through the proxy), and waits for the network to go idle. The rendered HTML goes through the normal extraction below. If the browser is refused too, the check is recorded as `status=blocked` (or `error` if the browser failed) and tried again at the next normal slot, not sooner. Newly blocked items are reported in one ntfy summary.
 - CAPTCHAs are never solved, and no CAPTCHA-solving service is used.
-- Every shop request (plain, short-link resolution and headless, loopback URLs included) goes through `fetch.proxy_url`, which is required: without it the config does not load and the service does not start, so there is no direct mode. If the proxy is down, the check is recorded as `status=error` with reason `proxy unreachable (...)` (or `net::ERR_PROXY_CONNECTION_FAILED` from the browser); it never falls back to a direct connection. Headless Chromium is started with WebRTC limited to proxied traffic, so pages cannot learn the real address over UDP. Proxy environment variables (`HTTP_PROXY` etc.) are ignored by both HTTP clients.
+- Every shop request (plain, short-link resolution and headless, loopback URLs included) goes through `fetch.proxy_url`, which is required: without it the config does not load and the service does not start, so there is no direct mode. If the proxy is down, the check is recorded as `status=error` with reason `proxy unreachable (...)` (or a proxy error from the browser); it never falls back to a direct connection. Camoufox runs with WebRTC blocked, so pages cannot learn the real address over UDP, and with Firefox's loopback proxy exemption turned off. Proxy environment variables (`HTTP_PROXY` etc.) are ignored by both HTTP clients.
 
 Some large retailers may still block it. The troubleshooting section below covers that.
 
@@ -56,7 +56,7 @@ Two files sit next to the container. Neither is committed.
 | `llm.model` | no | `mimo-v2.6-flash` | Model name. |
 | `politeness.min_interval_hours` | no | `6` | Minimum time between checks of the same site. |
 | `politeness.jitter_minutes` | no | `30` | Random delay added to each site's next check. |
-| `fetch.proxy_url` | **yes** | — | HTTP proxy for shop page fetches only (plain requests, short-link resolution and headless Chromium), e.g. a local VPN-backed proxy at `http://127.0.0.1:8888`. MiMo, ntfy, the heartbeat and the local API never use it. |
+| `fetch.proxy_url` | **yes** | — | HTTP proxy for shop page fetches only (plain requests, short-link resolution and headless Camoufox), e.g. a local VPN-backed proxy at `http://127.0.0.1:8888`. MiMo, ntfy, the heartbeat and the local API never use it. |
 | `data_dir` | no | `/data` | Holds `state.db` and the `heartbeat` file. Keep `/data` in the container. |
 | `heartbeat_url` | no | | Uptime Kuma push URL, fetched with GET after each successful run. It is never logged. |
 
@@ -116,7 +116,7 @@ shellcheck scripts/*.sh
 
 ## Deploy
 
-The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 1536m` (headroom for headless Chromium, which is launched only for a blocked page and closed afterwards), `pids_limit: 512` (Chromium's threads count; one heavy page peaked near 200), `init: true` (reaps browser processes), runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted. It drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem; only `/tmp` and `/home/app` (Chromium's crashpad handler needs a writable `$HOME`) are tmpfs.
+The service runs as one container (`compose.yaml`). It uses host networking with no published ports (the API binds to 127.0.0.1 only), `mem_limit: 1536m` (headroom for headless Camoufox, which is launched only for a blocked page and closed afterwards), `pids_limit: 512` (browser threads count), `init: true` (reaps browser processes), runs as uid 1000, and has `./config.yaml` (read-only) and `./data` bind-mounted. It drops all capabilities, sets `no-new-privileges` and has a read-only root filesystem; only `/tmp` and `/home/app` (the browser needs a writable `$HOME`) are tmpfs. The image is about 5.4 GB: the Camoufox build ships ~2 GB of fonts its fingerprints rely on.
 
 One-time setup on the host, under `~/wheel-n-deal/`: create `config.yaml`, `.env`, and `data/`, all owned by uid 1000. If they are missing, Docker creates the bind mounts as root, and a missing `config.yaml` becomes a directory.
 

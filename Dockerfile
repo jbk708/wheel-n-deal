@@ -26,13 +26,21 @@ RUN groupadd --gid "$APP_GID" app \
 
 COPY --from=builder --chown=$APP_UID:$APP_GID /app /app
 
+# Camoufox keeps its browser, GeoIP database and fingerprint model under
+# $XDG_CACHE_HOME/camoufox; outside $HOME, which is a tmpfs at runtime.
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+    XDG_CACHE_HOME=/opt/cache
 
-# Headless fallback for blocked pages: Playwright's own Chromium (the version pinned by the
-# playwright package) plus its system libraries. Chromium only, no headless shell.
-RUN playwright install --with-deps --no-shell chromium \
+# Headless fallback for blocked pages: Camoufox (pinned build) plus Firefox's system
+# libraries. The build ships ~2 GB of fonts, which its fingerprints need. Camoufox writes a
+# per-OS fontconfig file into its cache dir on first launch; generating it here lets the
+# root filesystem stay read-only.
+RUN playwright install-deps firefox \
+    && camoufox set official/stable/158.0.1-beta.41 \
+    && camoufox fetch \
+    && python -c "from wheel_n_deal.browser import CAMOUFOX_OPTIONS as o; from camoufox.utils import launch_options; launch_options(os=o['os'], headless=True)" \
+    && chmod -R a+rX /opt/cache \
     && rm -rf /var/lib/apt/lists/* /tmp/*
 
 USER app

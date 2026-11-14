@@ -8,8 +8,8 @@ import httpx
 
 # For our own services (MiMo, ntfy, heartbeat); shops get BROWSER_HEADERS instead.
 APP_USER_AGENT = f"wheel-n-deal/{version('wheel-n-deal')} (+personal price tracker)"
-# Keep in step with the Chromium bundled by the pinned Playwright, so the plain request and
-# the headless fallback present the same browser.
+# Keep in step with current stable desktop Chrome. (The headless fallback is Camoufox, a
+# separate Firefox identity, so nothing ties this to a bundled browser.)
 CHROME_MAJOR = 153
 BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
